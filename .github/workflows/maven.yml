@@ -54,7 +54,7 @@ jobs:
           java-version: ${{ matrix.java }}
 
       - name: Build with Maven
-        run: mvn verify -e -B -V
+        run: mvn verify -e -B -V -DdistributionFileName=apache-maven
 
       - name: Upload built Maven
         uses: actions/upload-artifact@v2
@@ -66,6 +66,7 @@ jobs:
 
     needs: build
 
+# TODO - simplify
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -91,4 +92,4 @@ jobs:
         run: ls -ltr built-maven/
 
       - name: Running integration tests
-        run: mvn install -Prun-its,embedded -Dmaven.repo.local=~/repo/ -DmavenDistro="built-maven/apache-maven/target/apache-maven-3.7.0-SNAPSHOT-bin.zip" -DwrapperDistroDir="built-maven/apache-maven/target" -f maven-integration-testing/pom.xml
+        run: mvn install -Prun-its,embedded -Dmaven.repo.local=~/repo/ -DmavenDistro="built-maven/apache-maven-bin.zip" -DwrapperDistroDir="built-maven/" -f maven-integration-testing/pom.xml
