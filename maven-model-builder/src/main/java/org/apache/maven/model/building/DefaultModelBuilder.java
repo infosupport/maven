@@ -19,21 +19,49 @@ package org.apache.maven.model.building;
  * under the License.
  */
 
+import static org.apache.maven.model.building.Result.error;
+import static org.apache.maven.model.building.Result.newResult;
+
+import org.apache.maven.artifact.versioning.ArtifactVersion;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Properties;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
 
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.artifact.versioning.InvalidVersionSpecificationException;
 import org.apache.maven.artifact.versioning.VersionRange;
+import org.apache.maven.building.Source;
+import org.apache.maven.feature.Features;
 import org.apache.maven.model.Activation;
 import org.apache.maven.model.Build;
+import org.apache.maven.model.BuildBase;
+import org.apache.maven.model.CiManagement;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.model.InputLocation;
 import org.apache.maven.model.InputSource;
 import org.apache.maven.model.Model;
+import org.apache.maven.model.ModelBase;
 import org.apache.maven.model.Parent;
 import org.apache.maven.model.Plugin;
+import org.apache.maven.model.PluginContainer;
 import org.apache.maven.model.PluginManagement;
 import org.apache.maven.model.Profile;
+import org.apache.maven.model.ReportPlugin;
+import org.apache.maven.model.Reporting;
 import org.apache.maven.model.Repository;
 import org.apache.maven.model.building.ModelProblem.Severity;
 import org.apache.maven.model.building.ModelProblem.Version;
@@ -43,6 +71,7 @@ import org.apache.maven.model.interpolation.ModelInterpolator;
 import org.apache.maven.model.io.ModelParseException;
 import org.apache.maven.model.management.DependencyManagementInjector;
 import org.apache.maven.model.management.PluginManagementInjector;
+import org.apache.maven.model.merge.ModelMerger;
 import org.apache.maven.model.normalization.ModelNormalizer;
 import org.apache.maven.model.path.ModelPathTranslator;
 import org.apache.maven.model.path.ModelUrlNormalizer;
@@ -62,25 +91,6 @@ import org.apache.maven.model.validation.ModelValidator;
 import org.codehaus.plexus.interpolation.MapBasedValueSource;
 import org.codehaus.plexus.interpolation.StringSearchInterpolator;
 import org.eclipse.sisu.Nullable;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
-
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
-
-import static org.apache.maven.model.building.Result.error;
-import static org.apache.maven.model.building.Result.newResult;
 
 /**
  * @author Benjamin Bentmann
@@ -107,7 +117,7 @@ public class DefaultModelBuilder
 
     @Inject
     private ModelUrlNormalizer modelUrlNormalizer;
-
+    
     @Inject
     private SuperPomProvider superPomProvider;
 
@@ -141,6 +151,8 @@ public class DefaultModelBuilder
 
     @Inject
     private ReportingConverter reportingConverter;
+    
+    private ModelMerger modelMerger = new FileToRawModelMerger();
 
     public DefaultModelBuilder setModelProcessor( ModelProcessor modelProcessor )
     {
@@ -243,7 +255,7 @@ public class DefaultModelBuilder
         this.reportingConverter = reportingConverter;
         return this;
     }
-
+    
     @SuppressWarnings( "checkstyle:methodlength" )
     @Override
     public ModelBuildingResult build( ModelBuildingRequest request )
@@ -360,15 +372,15 @@ public class DefaultModelBuilder
             }
             else if ( !parentIds.add( parentData.getId() ) )
             {
-                String message = "The parents form a cycle: ";
+                StringBuilder message = new StringBuilder( "The parents form a cycle: " );
                 for ( String modelId : parentIds )
                 {
-                    message += modelId + " -> ";
+                    message.append( modelId ).append( " -> " );
                 }
-                message += parentData.getId();
+                message.append( parentData.getId() );
 
                 problems.add( new ModelProblemCollectorRequest( ModelProblem.Severity.FATAL, ModelProblem.Version.BASE )
-                    .setMessage( message ) );
+                    .setMessage( message.toString() ) );
 
                 throw problems.newModelBuildingException();
             }
@@ -414,8 +426,18 @@ public class DefaultModelBuilder
         resultData.setArtifactId( resultModel.getArtifactId() );
         resultData.setVersion( resultModel.getVersion() );
 
-        result.setEffectiveModel( resultModel );
+        if ( request.getPomFile() != null )
+        {
+            intoCache( request.getModelCache(), new FileModelSource( request.getPomFile() ), ModelCacheTag.RAW,
+                      resultData );
+        }
+        else
+        {
+            intoCache( request.getModelCache(), request.getModelSource(), ModelCacheTag.RAW, resultData );
+        }
 
+        result.setEffectiveModel( resultModel );
+        
         for ( ModelData currentData : lineage )
         {
             String modelId = ( currentData != superData ) ? currentData.getId() : "";
@@ -437,7 +459,7 @@ public class DefaultModelBuilder
     public ModelBuildingResult build( ModelBuildingRequest request, ModelBuildingResult result )
         throws ModelBuildingException
     {
-        return build( request, result, new LinkedHashSet<String>() );
+        return build( request, result, new LinkedHashSet<>() );
     }
 
     private ModelBuildingResult build( ModelBuildingRequest request, ModelBuildingResult result,
@@ -518,21 +540,24 @@ public class DefaultModelBuilder
         }
     }
 
+    @SuppressWarnings( "checkstyle:methodlength" )
     private Model readModel( ModelSource modelSource, File pomFile, ModelBuildingRequest request,
                              DefaultModelProblemCollector problems )
         throws ModelBuildingException
     {
-        Model model;
-
         if ( modelSource == null )
         {
-            if ( pomFile != null )
+            modelSource =
+                new FileModelSource( Objects.requireNonNull( pomFile, "neither pomFile nor modelSource can be null" ) );
+        }
+
+        Model model;
+        if ( pomFile == null )
+        {
+            model = getModelFromCache( modelSource, request.getModelCache() );
+            if ( model != null )
             {
-                modelSource = new FileModelSource( pomFile );
-            }
-            else
-            {
-                throw new NullPointerException( "neither pomFile nor modelSource can be null" );
+                return model;
             }
         }
 
@@ -540,12 +565,20 @@ public class DefaultModelBuilder
         try
         {
             boolean strict = request.getValidationLevel() >= ModelBuildingRequest.VALIDATION_LEVEL_MAVEN_2_0;
-            InputSource source = request.isLocationTracking() ? new InputSource() : null;
 
-            Map<String, Object> options = new HashMap<>();
+            Map<String, Object> options = new HashMap<>( 3 );
             options.put( ModelProcessor.IS_STRICT, strict );
-            options.put( ModelProcessor.INPUT_SOURCE, source );
             options.put( ModelProcessor.SOURCE, modelSource );
+
+            InputSource source;
+            if ( request.isLocationTracking() ) 
+            {
+                source = (InputSource) options.computeIfAbsent( ModelProcessor.INPUT_SOURCE, k -> new InputSource() );
+            }
+            else
+            {
+                source = null;
+            }
 
             try
             {
@@ -616,10 +649,41 @@ public class DefaultModelBuilder
                 .setMessage( "Non-readable POM " + modelSource.getLocation() + ": " + msg ).setException( e ) );
             throw problems.newModelBuildingException();
         }
-
-        model.setPomFile( pomFile );
-
+        if ( pomFile != null )
+        {
+            model.setPomFile( pomFile );
+        }
+        else if ( modelSource instanceof FileModelSource )
+        {
+            model.setPomFile( ( (FileModelSource) modelSource ).getFile() );
+        }
         problems.setSource( model );
+
+        modelValidator.validateFileModel( model, request, problems );
+        request.setFileModel( model );
+        
+        if ( Features.buildConsumer().isActive() && pomFile != null )
+        {
+            try
+            {
+                Model rawModel =
+                    modelProcessor.read( pomFile,
+                               Collections.singletonMap( "transformerContext", request.getTransformerContext() ) );
+
+                model.setPomFile( pomFile );
+                
+                // model with locationTrackers, required for proper feedback during validations
+                model = request.getFileModel().clone();
+                
+                // Apply enriched data
+                modelMerger.merge( model, rawModel, false, null );
+            }
+            catch ( IOException e )
+            {
+                problems.add( new ModelProblemCollectorRequest( Severity.WARNING, Version.V37 ).setException( e ) );
+            }
+        }
+
         modelValidator.validateRawModel( model, request, problems );
 
         if ( hasFatalErrors( problems ) )
@@ -627,7 +691,69 @@ public class DefaultModelBuilder
             throw problems.newModelBuildingException();
         }
 
+        if ( pomFile != null )
+        {
+            intoCache( request.getModelCache(), modelSource, ModelCacheTag.FILEMODEL, model );
+        }
+
+        String groupId = getGroupId( model );
+        String artifactId = model.getArtifactId();
+        String version = getVersion( model );
+
+        ModelData modelData = new ModelData( modelSource, model, groupId, artifactId, version );
+        intoCache( request.getModelCache(), groupId, artifactId, version, ModelCacheTag.RAW, modelData );
+
         return model;
+    }
+
+    private Model getModelFromCache( ModelSource modelSource, ModelCache cache )
+    {
+        Model model;
+        if ( modelSource instanceof ArtifactModelSource )
+        {
+            ArtifactModelSource artifactModelSource = ( ArtifactModelSource ) modelSource;
+            ModelData modelData = fromCache( cache, artifactModelSource.getGroupId(),
+                                            artifactModelSource.getArtifactId(),
+                                            artifactModelSource.getVersion(), ModelCacheTag.RAW );
+            if ( modelData != null )
+            {
+                model = modelData.getModel();
+            }
+            else 
+            {
+                model = null;
+            }
+        }
+        else
+        {
+            model = fromCache( cache, modelSource, ModelCacheTag.FILEMODEL );
+            
+            if ( model != null )
+            {
+                model = model.clone();
+            }
+        }
+        return model;
+    }
+
+    private String getGroupId( Model model )
+    {
+        String groupId = model.getGroupId();
+        if ( groupId == null && model.getParent() != null )
+        {
+            groupId = model.getParent().getGroupId();
+        }
+        return groupId;
+    }
+
+    private String getVersion( Model model ) 
+    {
+        String version = model.getVersion();
+        if ( version == null && model.getParent() != null )
+        {
+            version = model.getParent().getVersion();
+        } 
+        return version;
     }
 
     private DefaultProfileActivationContext getProfileActivationContext( ModelBuildingRequest request )
@@ -708,10 +834,7 @@ public class DefaultModelBuilder
                     for ( Plugin plugin : mgmt.getPlugins() )
                     {
                         String key = plugin.getKey();
-                        if ( managedVersions.get( key ) == null )
-                        {
-                            managedVersions.put( key, plugin.getVersion() );
-                        }
+                        managedVersions.computeIfAbsent( key, k -> plugin.getVersion() );
                     }
                 }
             }
@@ -825,65 +948,79 @@ public class DefaultModelBuilder
                                   DefaultModelProblemCollector problems )
         throws ModelBuildingException
     {
-        ModelData parentData;
+        ModelData parentData = null;
 
         Parent parent = childModel.getParent();
 
         if ( parent != null )
         {
-            String groupId = parent.getGroupId();
-            String artifactId = parent.getArtifactId();
-            String version = parent.getVersion();
+            ModelSource expectedParentSource = getParentPomFile( childModel, childSource );
 
-            parentData = getCache( request.getModelCache(), groupId, artifactId, version, ModelCacheTag.RAW );
-
-            if ( parentData == null )
+            if ( expectedParentSource != null )
             {
-                parentData = readParentLocally( childModel, childSource, request, problems );
+                ModelData candidateData = readParentLocally( childModel, childSource, request, problems );
 
-                if ( parentData == null )
+                if ( candidateData != null )
                 {
-                    parentData = readParentExternally( childModel, request, problems );
-                }
-
-                putCache( request.getModelCache(), groupId, artifactId, version, ModelCacheTag.RAW, parentData );
-            }
-            else
-            {
-                /*
-                 * NOTE: This is a sanity check of the cache hit. If the cached parent POM was locally resolved, the
-                 * child's <relativePath> should point at that parent, too. If it doesn't, we ignore the cache and
-                 * resolve externally, to mimic the behavior if the cache didn't exist in the first place. Otherwise,
-                 * the cache would obscure a bad POM.
-                 */
-
-                File pomFile = parentData.getModel().getPomFile();
-                if ( pomFile != null )
-                {
-                    FileModelSource pomSource = new FileModelSource( pomFile );
-                    ModelSource expectedParentSource = getParentPomFile( childModel, childSource );
-
-                    if ( expectedParentSource == null || ( expectedParentSource instanceof ModelSource2
-                        && !pomSource.equals(  expectedParentSource ) ) )
+                    /*
+                     * NOTE: This is a sanity check of the cache hit. If the cached parent POM was locally resolved, 
+                     * the child's GAV should match with that parent, too. If it doesn't, we ignore the cache and
+                     * resolve externally, to mimic the behavior if the cache didn't exist in the first place. 
+                     * Otherwise, the cache would obscure a bad POM.
+                     */
+                    try
                     {
-                        parentData = readParentExternally( childModel, request, problems );
+                        VersionRange parentVersion = VersionRange.createFromVersionSpec( parent.getVersion() );
+                        ArtifactVersion actualVersion = new DefaultArtifactVersion( candidateData.getVersion() );
+
+                        if ( parent.getGroupId().equals( candidateData.getGroupId() )
+                            && parent.getArtifactId().equals( candidateData.getArtifactId() )
+                            && parentVersion.containsVersion( actualVersion ) )
+                        {
+                            parentData = candidateData;
+                        }
+                    }
+                    catch ( InvalidVersionSpecificationException e )
+                    {
+                        // This should already been blocked during validation
                     }
                 }
             }
 
-            Model parentModel = parentData.getModel();
-
-            if ( !"pom".equals( parentModel.getPackaging() ) )
+            if ( parentData == null )
             {
-                problems.add( new ModelProblemCollectorRequest( Severity.ERROR, Version.BASE )
-                    .setMessage( "Invalid packaging for parent POM " + ModelProblemUtils.toSourceHint( parentModel )
-                                     + ", must be \"pom\" but is \"" + parentModel.getPackaging() + "\"" )
-                    .setLocation( parentModel.getLocation( "packaging" ) ) );
+                ModelData candidateData = fromCache( request.getModelCache(), 
+                                                     parent.getGroupId(), parent.getArtifactId(),
+                                                     parent.getVersion(), ModelCacheTag.RAW );
+
+                
+                if ( candidateData != null && candidateData.getSource() instanceof ArtifactModelSource )
+                {
+                    // ArtifactModelSource means repositorySource
+                    parentData = candidateData;
+                }
+                else
+                {
+                    parentData = readParentExternally( childModel, request, problems );
+                    
+                    intoCache( request.getModelCache(), 
+                              parentData.getGroupId(), parentData.getArtifactId(),
+                              parentData.getVersion(), ModelCacheTag.RAW, parentData );
+                }
             }
-        }
-        else
-        {
-            parentData = null;
+            
+            if ( parentData != null ) 
+            {
+                Model parentModel = parentData.getModel();
+
+                if ( !"pom".equals( parentModel.getPackaging() ) )
+                {
+                    problems.add( new ModelProblemCollectorRequest( Severity.ERROR, Version.BASE )
+                        .setMessage( "Invalid packaging for parent POM " + ModelProblemUtils.toSourceHint( parentModel )
+                                         + ", must be \"pom\" but is \"" + parentModel.getPackaging() + "\"" )
+                        .setLocation( parentModel.getLocation( "packaging" ) ) );
+                }
+            }
         }
 
         return parentData;
@@ -906,13 +1043,7 @@ public class DefaultModelBuilder
                 return null;
             }
 
-            File pomFile = null;
-            if ( candidateSource instanceof FileModelSource )
-            {
-                pomFile = ( (FileModelSource) candidateSource ).getPomFile();
-            }
-
-            candidateModel = readModel( candidateSource, pomFile, request, problems );
+            candidateModel = readModel( candidateSource, null, request, problems );
         }
         else
         {
@@ -924,7 +1055,7 @@ public class DefaultModelBuilder
             catch ( UnresolvableModelException e )
             {
                 problems.add( new ModelProblemCollectorRequest( Severity.FATAL, Version.BASE ) //
-                .setMessage( e.getMessage().toString() ).setLocation( parent.getLocation( "" ) ).setException( e ) );
+                .setMessage( e.getMessage() ).setLocation( parent.getLocation( "" ) ).setException( e ) );
                 throw problems.newModelBuildingException();
             }
             if ( candidateModel == null )
@@ -1227,7 +1358,7 @@ public class DefaultModelBuilder
                 continue;
             }
 
-            DependencyManagement importMgmt = getCache( request.getModelCache(), groupId, artifactId, version,
+            DependencyManagement importMgmt = fromCache( request.getModelCache(), groupId, artifactId, version,
                                                         ModelCacheTag.IMPORT );
 
             if ( importMgmt == null )
@@ -1251,7 +1382,7 @@ public class DefaultModelBuilder
                     catch ( UnresolvableModelException e )
                     {
                         problems.add( new ModelProblemCollectorRequest( Severity.FATAL, Version.BASE )
-                            .setMessage( e.getMessage().toString() ).setException( e ) );
+                            .setMessage( e.getMessage() ).setException( e ) );
                         continue;
                     }
                 }
@@ -1262,7 +1393,7 @@ public class DefaultModelBuilder
                     final ModelSource importSource;
                     try
                     {
-                        importSource = modelResolver.resolveModel( groupId, artifactId, version );
+                        importSource = modelResolver.resolveModel( dependency );
                     }
                     catch ( UnresolvableModelException e )
                     {
@@ -1316,7 +1447,7 @@ public class DefaultModelBuilder
                     importMgmt = new DependencyManagement();
                 }
 
-                putCache( request.getModelCache(), groupId, artifactId, version, ModelCacheTag.IMPORT, importMgmt );
+                intoCache( request.getModelCache(), groupId, artifactId, version, ModelCacheTag.IMPORT, importMgmt );
             }
 
             if ( importMgmts == null )
@@ -1332,7 +1463,7 @@ public class DefaultModelBuilder
         dependencyManagementImporter.importManagement( model, importMgmts, request, problems );
     }
 
-    private <T> void putCache( ModelCache modelCache, String groupId, String artifactId, String version,
+    private <T> void intoCache( ModelCache modelCache, String groupId, String artifactId, String version,
                                ModelCacheTag<T> tag, T data )
     {
         if ( modelCache != null )
@@ -1341,12 +1472,33 @@ public class DefaultModelBuilder
         }
     }
 
-    private <T> T getCache( ModelCache modelCache, String groupId, String artifactId, String version,
+    private <T> void intoCache( ModelCache modelCache, Source source, ModelCacheTag<T> tag, T data )
+    {
+        if ( modelCache != null )
+        {
+            modelCache.put( source, tag.getName(), tag.intoCache( data ) );
+        }
+    }
+
+    private <T> T fromCache( ModelCache modelCache, String groupId, String artifactId, String version,
                             ModelCacheTag<T> tag )
     {
         if ( modelCache != null )
         {
             Object data = modelCache.get( groupId, artifactId, version, tag.getName() );
+            if ( data != null )
+            {
+                return tag.fromCache( tag.getType().cast( data ) );
+            }
+        }
+        return null;
+    }
+
+    private <T> T fromCache( ModelCache modelCache, Source source, ModelCacheTag<T> tag )
+    {
+        if ( modelCache != null )
+        {
+            Object data = modelCache.get( source, tag.getName() );
             if ( data != null )
             {
                 return tag.fromCache( tag.getType().cast( data ) );
@@ -1404,4 +1556,155 @@ public class DefaultModelBuilder
         }
     }
 
+    /**
+     * As long as Maven controls the BuildPomXMLFilter, the entities that need merging are known.
+     * All others can simply be copied from source to target to restore the locationTracker 
+     * 
+     * @author Robert Scholte
+     * @since 3.7.0
+     */
+    class FileToRawModelMerger extends ModelMerger
+    {
+        @Override
+        protected void mergeBuild_Extensions( Build target, Build source, boolean sourceDominant,
+                                              Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+
+        @Override
+        protected void mergeBuildBase_Resources( BuildBase target, BuildBase source, boolean sourceDominant,
+                                                 Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergeBuildBase_TestResources( BuildBase target, BuildBase source, boolean sourceDominant,
+                                                     Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergeCiManagement_Notifiers( CiManagement target, CiManagement source, boolean sourceDominant,
+                                                    Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergeDependencyManagement_Dependencies( DependencyManagement target, DependencyManagement source,
+                                                               boolean sourceDominant, Map<Object, Object> context )
+        {
+            Iterator<Dependency> sourceIterator = source.getDependencies().iterator();
+            target.getDependencies().stream().forEach( t -> mergeDependency( t, sourceIterator.next(), sourceDominant,
+                                                                             context ) );
+        }
+        
+        @Override
+        protected void mergeDependency_Exclusions( Dependency target, Dependency source, boolean sourceDominant,
+                                                   Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergeModel_Contributors( Model target, Model source, boolean sourceDominant,
+                                                Map<Object, Object> context )
+        {
+            // don't merge
+        }
+
+        @Override
+        protected void mergeModel_Developers( Model target, Model source, boolean sourceDominant,
+                                              Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergeModel_Licenses( Model target, Model source, boolean sourceDominant,
+                                            Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergeModel_MailingLists( Model target, Model source, boolean sourceDominant,
+                                                Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergeModel_Profiles( Model target, Model source, boolean sourceDominant,
+                                            Map<Object, Object> context )
+        {
+            Iterator<Profile> sourceIterator = source.getProfiles().iterator();
+            target.getProfiles().stream().forEach( t -> mergeProfile( t, sourceIterator.next(), sourceDominant,
+                                                                      context ) );
+        }
+        
+        @Override
+        protected void mergeModelBase_Dependencies( ModelBase target, ModelBase source, boolean sourceDominant,
+                                                    Map<Object, Object> context )
+        {
+            Iterator<Dependency> sourceIterator = source.getDependencies().iterator();
+            target.getDependencies().stream().forEach( t -> mergeDependency( t, sourceIterator.next(), sourceDominant,
+                                                                             context ) );
+        }
+        
+        @Override
+        protected void mergeModelBase_PluginRepositories( ModelBase target, ModelBase source, boolean sourceDominant,
+                                                          Map<Object, Object> context )
+        {
+            target.setPluginRepositories( source.getPluginRepositories() );
+        }
+        
+        @Override
+        protected void mergeModelBase_Repositories( ModelBase target, ModelBase source, boolean sourceDominant,
+                                                    Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergePlugin_Dependencies( Plugin target, Plugin source, boolean sourceDominant,
+                                                 Map<Object, Object> context )
+        {
+            Iterator<Dependency> sourceIterator = source.getDependencies().iterator();
+            target.getDependencies().stream().forEach( t -> mergeDependency( t, sourceIterator.next(), sourceDominant,
+                                                                             context ) );
+        }
+        
+        @Override
+        protected void mergePlugin_Executions( Plugin target, Plugin source, boolean sourceDominant,
+                                               Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergeReporting_Plugins( Reporting target, Reporting source, boolean sourceDominant,
+                                               Map<Object, Object> context )
+        {
+            // don't merge
+        }
+
+        @Override
+        protected void mergeReportPlugin_ReportSets( ReportPlugin target, ReportPlugin source, boolean sourceDominant,
+                                                     Map<Object, Object> context )
+        {
+            // don't merge
+        }
+        
+        @Override
+        protected void mergePluginContainer_Plugins( PluginContainer target, PluginContainer source,
+                                                     boolean sourceDominant, Map<Object, Object> context )
+        {
+            // don't merge
+        }
+    }
 }

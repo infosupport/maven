@@ -19,6 +19,14 @@ package org.apache.maven.lifecycle.internal.builder;
  * under the License.
  */
 
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.BuildFailure;
 import org.apache.maven.execution.ExecutionEvent;
@@ -28,6 +36,7 @@ import org.apache.maven.lifecycle.LifecycleExecutionException;
 import org.apache.maven.lifecycle.LifecycleNotFoundException;
 import org.apache.maven.lifecycle.LifecyclePhaseNotFoundException;
 import org.apache.maven.lifecycle.MavenExecutionPlan;
+import org.apache.maven.lifecycle.internal.DefaultLifecyclePluginAnalyzer;
 import org.apache.maven.lifecycle.internal.ExecutionEventCatapult;
 import org.apache.maven.lifecycle.internal.LifecycleDebugLogger;
 import org.apache.maven.lifecycle.internal.LifecycleExecutionPlanCalculator;
@@ -35,6 +44,7 @@ import org.apache.maven.lifecycle.internal.ReactorContext;
 import org.apache.maven.lifecycle.internal.TaskSegment;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.plugin.InvalidPluginDescriptorException;
+import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.plugin.MojoNotFoundException;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
 import org.apache.maven.plugin.PluginNotFoundException;
@@ -44,11 +54,7 @@ import org.apache.maven.plugin.prefix.NoPluginFoundForPrefixException;
 import org.apache.maven.plugin.version.PluginVersionResolutionException;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
-
-import java.util.Set;
 
 /**
  * Common code that is shared by the LifecycleModuleBuilder and the LifeCycleWeaveBuilder
@@ -58,19 +64,20 @@ import java.util.Set;
  *         Builds one or more lifecycles for a full module
  *         NOTE: This class is not part of any public api and can be changed or deleted without prior notice.
  */
-@Component( role = BuilderCommon.class )
+@Named
+@Singleton
 public class BuilderCommon
 {
-    @Requirement
+    @Inject
     private LifecycleDebugLogger lifecycleDebugLogger;
 
-    @Requirement
+    @Inject
     private LifecycleExecutionPlanCalculator lifeCycleExecutionPlanCalculator;
 
-    @Requirement
+    @Inject
     private ExecutionEventCatapult eventCatapult;
 
-    @Requirement
+    @Inject
     private Logger logger;
 
 
@@ -132,6 +139,23 @@ public class BuilderCommon
                 }
                 logger.warn( "*****************************************************************" );
             }
+        }
+        
+        final String defaulModelId = DefaultLifecyclePluginAnalyzer.DEFAULTLIFECYCLEBINDINGS_MODELID;
+        
+        List<String> unversionedPlugins = executionPlan.getMojoExecutions().stream()
+                         .map( MojoExecution::getPlugin )
+                         .filter( p -> p.getLocation( "version" ) != null ) // versionless cli goal (?)
+                         .filter( p -> p.getLocation( "version" ).getSource() != null ) // versionless in pom (?)
+                         .filter( p -> defaulModelId.equals( p.getLocation( "version" ).getSource().getModelId() ) )
+                         .distinct()
+                         .map( Plugin::getArtifactId ) // managed by us, groupId is always o.a.m.plugins 
+                         .collect( Collectors.toList() );
+        
+        if ( !unversionedPlugins.isEmpty() )
+        {
+            logger.warn( "Version not locked for default bindings plugins " + unversionedPlugins
+                + ", you should define versions in pluginManagement section of your " + "pom.xml or parent" );
         }
 
         return executionPlan;

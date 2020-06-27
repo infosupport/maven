@@ -41,7 +41,9 @@ public class DefaultMavenExecutionResult
     private final List<Throwable> exceptions = new CopyOnWriteArrayList<>();
 
     private final Map<MavenProject, BuildSummary> buildSummaries =
-        Collections.synchronizedMap( new IdentityHashMap<MavenProject, BuildSummary>() );
+        Collections.synchronizedMap( new IdentityHashMap<>() );
+
+    private boolean canResume = false;
 
     public MavenExecutionResult setProject( MavenProject project )
     {
@@ -65,7 +67,7 @@ public class DefaultMavenExecutionResult
     public List<MavenProject> getTopologicallySortedProjects()
     {
         return null == topologicallySortedProjects
-                   ? Collections.<MavenProject>emptyList()
+                   ? Collections.emptyList()
                    : Collections.unmodifiableList( topologicallySortedProjects );
 
     }
@@ -107,5 +109,17 @@ public class DefaultMavenExecutionResult
     public void addBuildSummary( BuildSummary summary )
     {
         buildSummaries.put( summary.getProject(), summary );
+    }
+
+    @Override
+    public boolean canResume()
+    {
+        return canResume;
+    }
+
+    @Override
+    public void setCanResume( boolean canResume )
+    {
+        this.canResume = canResume;
     }
 }

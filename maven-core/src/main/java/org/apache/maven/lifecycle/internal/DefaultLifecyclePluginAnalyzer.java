@@ -19,6 +19,14 @@ package org.apache.maven.lifecycle.internal;
  * under the License.
  */
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.maven.lifecycle.DefaultLifecycles;
 import org.apache.maven.lifecycle.LifeCyclePluginAnalyzer;
 import org.apache.maven.lifecycle.Lifecycle;
@@ -35,15 +43,6 @@ import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.StringUtils;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * <strong>NOTE:</strong> This class is not part of any public api and can be changed or deleted without prior notice.
  * 
@@ -57,6 +56,8 @@ import java.util.Set;
 public class DefaultLifecyclePluginAnalyzer
     implements LifeCyclePluginAnalyzer
 {
+    public static final String DEFAULTLIFECYCLEBINDINGS_MODELID = "org.apache.maven:maven-core:"
+        + DefaultLifecyclePluginAnalyzer.class.getPackage().getImplementationVersion() + ":default-lifecycle-bindings";
 
     @Requirement( role = LifecycleMapping.class )
     private Map<String, LifecycleMapping> lifecycleMappings;
@@ -137,25 +138,15 @@ public class DefaultLifecyclePluginAnalyzer
 
         List<Lifecycle> lifecycles = new ArrayList<>( defaultLifeCycles.getLifeCycles() );
 
-        Collections.sort( lifecycles, new Comparator<Lifecycle>()
-        {
-
-            public int compare( Lifecycle l1, Lifecycle l2 )
-            {
-                return l1.getId().compareTo( l2.getId() );
-            }
-
-        } );
+        lifecycles.sort( Comparator.comparing( Lifecycle::getId ) );
 
         return lifecycles;
     }
 
     private void parseLifecyclePhaseDefinitions( Map<Plugin, Plugin> plugins, String phase, LifecyclePhase goals )
     {
-        String modelId = "org.apache.maven:maven-core:" + this.getClass().getPackage().getImplementationVersion()
-            + ":default-lifecycle-bindings";
         InputSource inputSource = new InputSource();
-        inputSource.setModelId( modelId );
+        inputSource.setModelId( DEFAULTLIFECYCLEBINDINGS_MODELID );
         InputLocation location = new InputLocation( -1, -1, inputSource );
         location.setLocation( 0, location );
 

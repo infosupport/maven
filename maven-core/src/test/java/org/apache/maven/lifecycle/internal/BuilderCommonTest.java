@@ -15,15 +15,18 @@ package org.apache.maven.lifecycle.internal;
  * the License.
  */
 
-import junit.framework.TestCase;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.lifecycle.MavenExecutionPlan;
 import org.apache.maven.lifecycle.internal.builder.BuilderCommon;
 import org.apache.maven.lifecycle.internal.stub.LifecycleExecutionPlanCalculatorStub;
-import org.apache.maven.lifecycle.internal.stub.LoggerStub;
 import org.apache.maven.lifecycle.internal.stub.ProjectDependencyGraphStub;
+import org.codehaus.plexus.logging.Logger;
+import org.junit.Test;
+
 
 import java.util.HashSet;
 
@@ -31,8 +34,10 @@ import java.util.HashSet;
  * @author Kristian Rosenvold
  */
 public class BuilderCommonTest
-    extends TestCase
 {
+    private Logger logger = mock( Logger.class );
+    
+    @Test
     public void testResolveBuildPlan()
         throws Exception
     {
@@ -45,12 +50,34 @@ public class BuilderCommonTest
         final BuilderCommon builderCommon = getBuilderCommon();
         final MavenExecutionPlan plan =
             builderCommon.resolveBuildPlan( session1, ProjectDependencyGraphStub.A, taskSegment1,
-                                            new HashSet<Artifact>() );
+                    new HashSet<>() );
         assertEquals( LifecycleExecutionPlanCalculatorStub.getProjectAExceutionPlan().size(), plan.size() );
-
     }
+    
+    @Test
+    public void testDefaultBindingPluginsWarning()
+        throws Exception
+    {
+        MavenSession original = ProjectDependencyGraphStub.getMavenSession();
 
+        final TaskSegment taskSegment1 = new TaskSegment( false );
+        final MavenSession session1 = original.clone();
+        session1.setCurrentProject( ProjectDependencyGraphStub.A );
 
+        getBuilderCommon().resolveBuildPlan( session1, ProjectDependencyGraphStub.A, taskSegment1, new HashSet<>() );
+        
+        verify( logger ).warn("Version not locked for default bindings plugins ["
+            + "stub-plugin-initialize, "
+            + "stub-plugin-process-resources, "
+            + "stub-plugin-compile, "
+            + "stub-plugin-process-test-resources, "
+            + "stub-plugin-test-compile, "
+            + "stub-plugin-test, "
+            + "stub-plugin-package, "
+            + "stub-plugin-install], "
+            + "you should define versions in pluginManagement section of your pom.xml or parent");
+    }
+    
     public void testHandleBuildError()
         throws Exception
     {
@@ -66,11 +93,11 @@ public class BuilderCommonTest
     {
     }
 
-    public static BuilderCommon getBuilderCommon()
+    public BuilderCommon getBuilderCommon()
     {
-        final LifecycleDebugLogger logger = new LifecycleDebugLogger( new LoggerStub() );
-        return new BuilderCommon( logger, new LifecycleExecutionPlanCalculatorStub(),
-                                  new LoggerStub() );
+        final LifecycleDebugLogger debugLogger = new LifecycleDebugLogger( logger );
+        return new BuilderCommon( debugLogger, new LifecycleExecutionPlanCalculatorStub(),
+                                  logger );
     }
 
 }

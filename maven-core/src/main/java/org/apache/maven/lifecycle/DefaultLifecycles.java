@@ -19,19 +19,19 @@ package org.apache.maven.lifecycle;
  * under the License.
  */
 
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
-import org.codehaus.plexus.util.StringUtils;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
 
 /**
  * @since 3.0
@@ -40,33 +40,43 @@ import java.util.Set;
  */
 // TODO The configuration for the lifecycle needs to be externalized so that I can use the annotations properly for the
 // wiring and reference and external source for the lifecycle configuration.
-@Component( role = DefaultLifecycles.class )
+@Named
+@Singleton
 public class DefaultLifecycles
 {
-    public static final String[] STANDARD_LIFECYCLES = { "default", "clean", "site" };
+    public static final String[] STANDARD_LIFECYCLES = { "default", "clean", "site", "wrapper" };
 
     // @Configuration(source="org/apache/maven/lifecycle/lifecycles.xml")
 
-    @Requirement( role = Lifecycle.class )
-    private Map<String, Lifecycle> lifecycles;
+    private final Map<String, Lifecycle> lifecyclesMap;
 
-    @Requirement
-    private Logger logger;
+    private final Logger logger;
 
     public DefaultLifecycles()
     {
+        this.lifecyclesMap = null;
+        this.logger = null;
     }
 
-    public DefaultLifecycles( Map<String, Lifecycle> lifecycles, Logger logger )
+    @Inject
+    public DefaultLifecycles( Map<String, Lifecycle> lifecyclesMap, Logger logger )
     {
-        this.lifecycles = new LinkedHashMap<>();
+        // Must keep the lifecyclesMap as is.
+        // During initialization it only contains the default lifecycles.
+        // However, extensions might add custom lifecycles later on.
+        this.lifecyclesMap = lifecyclesMap;
         this.logger = logger;
-        this.lifecycles = lifecycles;
     }
 
-    public Lifecycle get( String key )
+    /**
+     * Get lifecycle based on phase
+     * 
+     * @param phase
+     * @return
+     */
+    public Lifecycle get( String phase )
     {
-        return getPhaseToLifecycleMap().get( key );
+        return getPhaseToLifecycleMap().get( phase );
     }
 
     /**
@@ -80,7 +90,7 @@ public class DefaultLifecycles
         // If people are going to make their own lifecycles then we need to tell people how to namespace them correctly
         // so that they don't interfere with internally defined lifecycles.
 
-        HashMap<String, Lifecycle> phaseToLifecycleMap = new HashMap<>();
+        Map<String, Lifecycle> phaseToLifecycleMap = new HashMap<>();
 
         for ( Lifecycle lifecycle : getLifeCycles() )
         {
@@ -110,36 +120,35 @@ public class DefaultLifecycles
 
     public List<Lifecycle> getLifeCycles()
     {
-        // ensure canonical order of standard lifecycles
-        Map<String, Lifecycle> lifecycles = new LinkedHashMap<>( this.lifecycles );
-
-        LinkedHashSet<String> lifecycleNames = new LinkedHashSet<>( Arrays.asList( STANDARD_LIFECYCLES ) );
-        lifecycleNames.addAll( lifecycles.keySet() );
-
-        ArrayList<Lifecycle> result = new ArrayList<>();
-        for ( String name : lifecycleNames )
+        List<String> lifecycleIds = Arrays.asList( STANDARD_LIFECYCLES );
+        
+        Comparator<String> comparator = ( l, r ) -> 
         {
-            Lifecycle lifecycle = lifecycles.get( name );
-            if ( lifecycle.getId() == null )
-            {
-                throw new NullPointerException( "A lifecycle must have an id." );
-            }
-            result.add( lifecycle );
-        }
+            int lx = lifecycleIds.indexOf( l );
+            int rx = lifecycleIds.indexOf( r );
 
-        return result;
+            if ( lx < 0 || rx < 0 ) 
+            {
+                return rx - lx;
+            }
+            else 
+            {
+                return lx - rx;
+            }
+        }; 
+        
+        // ensure canonical order of standard lifecycles
+        return lifecyclesMap.values().stream()
+                                .peek( l -> Objects.requireNonNull( l.getId(), "A lifecycle must have an id." ) )
+                                .sorted( Comparator.comparing( Lifecycle::getId, comparator ) )
+                                .collect( Collectors.toList() );
     }
 
     public String getLifecyclePhaseList()
     {
-        Set<String> phases = new LinkedHashSet<>();
-
-        for ( Lifecycle lifecycle : getLifeCycles() )
-        {
-            phases.addAll( lifecycle.getPhases() );
-        }
-
-        return StringUtils.join( phases.iterator(), ", " );
+        return getLifeCycles().stream()
+                        .flatMap( l -> l.getPhases().stream() )
+                        .collect( Collectors.joining( ", " ) );
     }
-
+    
 }
