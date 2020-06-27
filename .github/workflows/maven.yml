@@ -76,8 +76,8 @@ jobs:
     steps:
       - name: Checkout integration test project - master
         uses: actions/checkout@v2
-        repository: apache/maven-integration-testing
         with:
+          repository: apache/maven-integration-testing
           path: maven-integration-testing/
 
       - name: Download built Maven
@@ -91,4 +91,4 @@ jobs:
         run: ls -ltr built-maven/
 
       - name: Running integration tests
-        run: mvn clean install -Prun-its,embedded -Dmaven.repo.local=~/repo/ -DmavenDistro="built-maven/apache-maven/target/apache-maven-3.7.0-SNAPSHOT-bin.zip" -DwrapperDistroDir="built-maven/apache-maven/target" -f maven-integration-testing/pom.xml
+        run: mvn install -Prun-its,embedded -Dmaven.repo.local=~/repo/ -DmavenDistro="built-maven/apache-maven/target/apache-maven-3.7.0-SNAPSHOT-bin.zip" -DwrapperDistroDir="built-maven/apache-maven/target" -f maven-integration-testing/pom.xml
