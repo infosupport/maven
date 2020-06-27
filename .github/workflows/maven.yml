@@ -91,5 +91,9 @@ jobs:
       - name: debug ls
         run: ls -ltr built-maven/
 
+# TODO - Remove
+      - name: debug ls
+        run: ls -ltr ~
+
       - name: Running integration tests
-        run: mvn install -Prun-its,embedded -Dmaven.repo.local=~/repo/ -DmavenDistro="built-maven/apache-maven-bin.zip" -DwrapperDistroDir="built-maven/" -f maven-integration-testing/pom.xml
+        run: mvn install -e -B -V -Prun-its,embedded -Dmaven.repo.local=~/repo/ -DmavenDistro="~/built-maven/apache-maven-bin.zip" -DwrapperDistroDir="~/built-maven/" -f maven-integration-testing/pom.xml
