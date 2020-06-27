@@ -75,7 +75,8 @@ jobs:
 
     steps:
       - name: Checkout integration test project - master
-        uses: apache/maven-integration-testing
+        uses: actions/checkout@v2
+        repository: apache/maven-integration-testing
         with:
           path: maven-integration-testing/
 
