@@ -64,16 +64,8 @@ jobs:
           path: apache-maven/target/
 
   integration-test:
-
     needs: build
-
-# TODO - simplify
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        java: [11]
-
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Collect environment context variables
