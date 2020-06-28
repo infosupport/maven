@@ -74,17 +74,17 @@ jobs:
           echo "::set-env name=GITHUB_BRANCH::${GITHUB_REF#refs/heads/}"
           echo "::set-env name=GITHUB_USER::${GITHUB_REPOSITORY%/*}"
 
-      - name: Checkout feature branch on forked maven-integration-testing repo
+      - name: Checkout feature branch on the forked maven-integration-testing repo
         uses: actions/checkout@v2
         env:
-          - GITHUB_USER
-          - GITHUB_BRANCH
+          GITHUB_USER
+          GITHUB_BRANCH
         with:
           repository: ${{ GITHUB_USER }}/maven-integration-testing
           path: maven-integration-testing/
           ref: ${{ GITHUB_BRANCH }}
 
-      - name: Checkout master branch on apache/maven-integration-testing repo
+      - name: Checkout master branch on the apache/maven-integration-testing repo
         uses: actions/checkout@v2
         if: failure()
         with:
