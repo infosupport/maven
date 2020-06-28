@@ -58,6 +58,7 @@ jobs:
 
       - name: Upload built Maven
         uses: actions/upload-artifact@v2
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.java == '11' }}
         with:
           name: built-maven
           path: apache-maven/target/
