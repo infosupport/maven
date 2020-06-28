@@ -83,7 +83,7 @@ jobs:
               target_branch=$branch
               target_user=$user
             else
-              echo "Could not find fork \""$user"/"$repo"\" or a branch \"$branch\" in this fork. Falling back to \"$target_branch\" in \"$target_user/$repo\"."
+              echo "Could not find fork \"$user/$repo\" or a branch \"$branch\" in this fork. Falling back to \"$target_branch\" in \"$target_user/$repo\"."
             fi
           else
             echo "Integration tests will run against $target_user/$repo for master builds."
