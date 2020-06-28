@@ -76,13 +76,10 @@ jobs:
 
       - name: Checkout feature branch on the forked maven-integration-testing repo
         uses: actions/checkout@v2
-        env:
-          - REPO_USER
-          - REPO_BRANCH
         with:
-          repository: ${{ REPO_USER }}/maven-integration-testing
+          repository: ${{ env.REPO_USER }}/maven-integration-testing
           path: maven-integration-testing/
-          ref: ${{ REPO_BRANCH }}
+          ref: ${{ env.REPO_BRANCH }}
 
       - name: Checkout master branch on the apache/maven-integration-testing repo
         uses: actions/checkout@v2
