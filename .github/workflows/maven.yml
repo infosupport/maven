@@ -76,33 +76,45 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout ${GITHUB_REPOSITORY%/*}/maven-integration-testing repo on ${GITHUB_REF##*/}
+      - name: Collect environment context variables
+        shell: bash
+        run: |
+          echo "::set-env name=GITHUB_BRANCH::${GITHUB_REF#refs/heads/}"
+          echo "::set-env name=GITHUB_USER::${GITHUB_REPOSITORY%/*}"
+
+      - name: Checkout feature branch on forked maven-integration-testing repo
         uses: actions/checkout@v2
         with:
-          repository: ${GITHUB_REPOSITORY%/*}/maven-integration-testing
+          repository: ${{ GITHUB_USER }}/maven-integration-testing
           path: maven-integration-testing/
-          ref: ${GITHUB_REF##*/}
+          ref: ${{ GITHUB_BRANCH }}
 
-      - name: Checkout apache/maven-integration-testing repo on master
+      - name: Checkout master branch on apache/maven-integration-testing repo
         uses: actions/checkout@v2
         if: failure()
         with:
           repository: apache/maven-integration-testing
           path: maven-integration-testing/
 
+# TODO - split up integration test setup from the actual build
+
       - name: Download built Maven
         uses: actions/download-artifact@v2
+        if: always()
         with:
           name: built-maven
           path: built-maven/
 
 # TODO - Remove
       - name: debug ls
+        if: always()
         run: ls -laSh built-maven/
 
 # TODO - Remove
       - name: debug ls
+        if: always()
         run: ls -laSh $GITHUB_WORKSPACE
 
       - name: Running integration tests
+        if: always()
         run: mvn install -e -B -V -Prun-its,embedded -Dmaven.repo.local=$GITHUB_WORKSPACE/repo/ -DmavenDistro="$GITHUB_WORKSPACE/built-maven/apache-maven-bin.zip" -DwrapperDistroDir="$GITHUB_WORKSPACE/built-maven/" -f maven-integration-testing/pom.xml
