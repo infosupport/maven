@@ -71,6 +71,7 @@ jobs:
       - name: Collect environment context variables
         shell: bash
         run: |
+          set +e
           repo=maven-integration-testing
           user=${GITHUB_REPOSITORY%/*}
           branch=${GITHUB_REF#refs/heads/}
