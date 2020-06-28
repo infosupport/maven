@@ -98,13 +98,5 @@ jobs:
           name: built-maven
           path: built-maven/
 
-# TODO - Remove
-      - name: debug ls
-        run: ls -laSh built-maven/
-
-# TODO - Remove
-      - name: debug ls
-        run: ls -laSh $GITHUB_WORKSPACE
-
       - name: Running integration tests
         run: mvn install -e -B -V -Prun-its,embedded -Dmaven.repo.local=$GITHUB_WORKSPACE/repo/ -DmavenDistro="$GITHUB_WORKSPACE/built-maven/apache-maven-bin.zip" -DwrapperDistroDir="$GITHUB_WORKSPACE/built-maven/" -f maven-integration-testing/pom.xml
