@@ -116,7 +116,11 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: built-maven-wrapper
-          path: built-maven-wrapper/maven-wrapper.jar
+          path: built-maven-wrapper/
+
+# TODO remove
+      - name: debug ls
+        run: ls -laSh built-maven-wrapper/
 
       - name: Running integration tests
         run: mvn install -e -B -V -Prun-its,embedded -Dmaven.repo.local=$GITHUB_WORKSPACE/repo/ -DmavenDistro="$GITHUB_WORKSPACE/built-maven/apache-maven-bin.zip" -DwrapperDistroDir="$GITHUB_WORKSPACE/built-maven/" -DmavenWrapper="$GITHUB_WORKSPACE/built-maven-wrapper/maven-wrapper.jar" -f maven-integration-testing/pom.xml
