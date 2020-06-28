@@ -75,8 +75,16 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout integration test project - master
+      - name: Checkout ${GITHUB_REPOSITORY%/*}/maven-integration-testing repo on ${GITHUB_REF##*/}
         uses: actions/checkout@v2
+        with:
+          repository: ${GITHUB_REPOSITORY%/*}/maven-integration-testing
+          path: maven-integration-testing/
+          ref: ${GITHUB_REF##*/}
+
+      - name: Checkout apache/maven-integration-testing repo on master
+        uses: actions/checkout@v2
+        if: failure()
         with:
           repository: apache/maven-integration-testing
           path: maven-integration-testing/
