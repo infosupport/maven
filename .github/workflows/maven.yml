@@ -84,6 +84,9 @@ jobs:
 
       - name: Checkout feature branch on forked maven-integration-testing repo
         uses: actions/checkout@v2
+        env:
+          - GITHUB_USER
+          - GITHUB_BRANCH
         with:
           repository: ${{ GITHUB_USER }}/maven-integration-testing
           path: maven-integration-testing/
