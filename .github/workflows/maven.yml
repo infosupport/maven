@@ -63,6 +63,13 @@ jobs:
           name: built-maven
           path: apache-maven/target/
 
+      - name: Upload built Maven Wrapper
+        uses: actions/upload-artifact@v2
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.java == '11' }}
+        with:
+          name: built-maven-wrapper
+          path: maven-wrapper/target/maven-wrapper.jar
+
   integration-test:
     needs: build
     runs-on: ubuntu-latest
@@ -105,5 +112,11 @@ jobs:
           name: built-maven
           path: built-maven/
 
+      - name: Download built Maven Wrapper
+        uses: actions/download-artifact@v2
+        with:
+          name: built-maven-wrapper
+          path: built-maven-wrapper/maven-wrapper.jar
+
       - name: Running integration tests
-        run: mvn install -e -B -V -Prun-its,embedded -Dmaven.repo.local=$GITHUB_WORKSPACE/repo/ -DmavenDistro="$GITHUB_WORKSPACE/built-maven/apache-maven-bin.zip" -DwrapperDistroDir="$GITHUB_WORKSPACE/built-maven/" -f maven-integration-testing/pom.xml
+        run: mvn install -e -B -V -Prun-its,embedded -Dmaven.repo.local=$GITHUB_WORKSPACE/repo/ -DmavenDistro="$GITHUB_WORKSPACE/built-maven/apache-maven-bin.zip" -DwrapperDistroDir="$GITHUB_WORKSPACE/built-maven/" -DmavenWrapper="$GITHUB_WORKSPACE/built-maven-wrapper/maven-wrapper.jar" -f maven-integration-testing/pom.xml
