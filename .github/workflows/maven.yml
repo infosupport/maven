@@ -74,16 +74,22 @@ jobs:
           repo=maven-integration-testing
           user=${GITHUB_REPOSITORY%/*}
           branch=${GITHUB_REF#refs/heads/}
-          git ls-remote https://github.com/$user/$repo.git | grep $GITHUB_REF > /dev/null
-          if [ $? -eq 0 ]; then
-            echo "Using branch \"$branch\" in fork \"$user/$repo\"."
-            echo "::set-env name=REPO_BRANCH::$branch"
-            echo "::set-env name=REPO_USER::$user"
+          target_branch=master
+          target_user=apache
+          if [ $branch != "master" ]; then
+            git ls-remote https://github.com/$user/$repo.git | grep $GITHUB_REF > /dev/null
+            if [ $? -eq 0 ]; then
+              echo "Found a branch \"$branch\" in fork \"$user/$repo\", configuring this for the integration tests to be run against."
+              target_branch=$branch
+              target_user=$user
+            else
+              echo "Could not find fork \""$user"/"$repo"\" or a branch \"$branch\" in this fork. Falling back to \"$target_branch\" in \"$target_user/$repo\"."
+            fi
           else
-            echo "Could not find fork \"$user/$repo\" or branch \"$branch\" in fork. Falling back to \"master\" in \"apache/$repo\"."
-            echo "::set-env name=REPO_BRANCH::master"
-            echo "::set-env name=REPO_USER::apache"
+            echo "Integration tests will run against $target_user/$repo for master builds."
           fi
+          echo "::set-env name=REPO_BRANCH::$target_branch"
+          echo "::set-env name=REPO_USER::$target_user"
 
       - name: Checkout maven-integration-testing
         uses: actions/checkout@v2
