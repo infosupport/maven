@@ -123,4 +123,5 @@ jobs:
           java-version: ${{ matrix.java }}
 
       - name: Running integration tests
+        shell: bash
         run: mvn install -e -B -V -Prun-its,embedded -Dmaven.repo.local=$GITHUB_WORKSPACE/repo/ -DmavenDistro="$GITHUB_WORKSPACE/built-maven/apache-maven-bin.zip" -DwrapperDistroDir="$GITHUB_WORKSPACE/built-maven/" -DmavenWrapper="$GITHUB_WORKSPACE/built-maven-wrapper/maven-wrapper.jar" -f maven-integration-testing/pom.xml
