@@ -147,6 +147,13 @@ public class DefaultGraphBuilderTest
                         .excludedProjects( MODULE_B )
                         .makeBehavior( REACTOR_MAKE_UPSTREAM )
                         .expectResult( PARENT_MODULE, MODULE_C, MODULE_A, MODULE_C_2 ),
+                scenario( "Excluding a project additionally excludes its children" )
+                        .excludedProjects( MODULE_C )
+                        .expectResult( PARENT_MODULE, MODULE_A, MODULE_B, INDEPENDENT_MODULE ),
+                scenario( "Excluding a project additionally excludes its children, but a child can be selected separately" )
+                        .selectedProjects( MODULE_C_1 )
+                        .excludedProjects( MODULE_C )
+                        .expectResult( MODULE_C_1 ),
                 scenario( "Excluding an also make dependency from resumeFrom does take its transitive dependency" )
                         .resumeFrom( MODULE_C_2 )
                         .excludedProjects( MODULE_B )
@@ -156,6 +163,10 @@ public class DefaultGraphBuilderTest
                         .resumeFrom( MODULE_A )
                         .excludedProjects( MODULE_B )
                         .expectResult( MODULE_A, MODULE_C_2, INDEPENDENT_MODULE ),
+                scenario( "Resume from exclude project upstream (should not fail)" )
+                        .resumeFrom( MODULE_B )
+                        .excludedProjects( MODULE_A )
+                        .expectResult( MODULE_B, MODULE_C_2, INDEPENDENT_MODULE ),
                 scenario( "Exclude the project we are resuming from (as proposed in MNG-6676)" )
                         .resumeFrom( MODULE_B )
                         .excludedProjects( MODULE_B )

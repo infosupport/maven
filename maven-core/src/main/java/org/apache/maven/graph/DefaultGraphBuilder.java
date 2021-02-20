@@ -140,7 +140,7 @@ public class DefaultGraphBuilder
         activeProjects = trimProjectsToRequest( activeProjects, projectDependencyGraph, session.getRequest() );
         activeProjects = trimSelectedProjects( activeProjects, projectDependencyGraph, session.getRequest() );
         activeProjects = trimResumedProjects( activeProjects, projectDependencyGraph, session.getRequest() );
-        activeProjects = trimExcludedProjects( activeProjects, session.getRequest() );
+        activeProjects = trimExcludedProjects( activeProjects, projectDependencyGraph, session.getRequest() );
 
         if ( activeProjects.size() != projectDependencyGraph.getSortedProjects().size() )
         {
@@ -237,7 +237,8 @@ public class DefaultGraphBuilder
         return result;
     }
 
-    private List<MavenProject> trimExcludedProjects( List<MavenProject> projects, MavenExecutionRequest request )
+    private List<MavenProject> trimExcludedProjects( List<MavenProject> projects, ProjectDependencyGraph graph,
+                                                     MavenExecutionRequest request )
         throws MavenExecutionException
     {
         List<MavenProject> result = projects;
@@ -250,12 +251,26 @@ public class DefaultGraphBuilder
 
             for ( String selector : request.getExcludedProjects() )
             {
-                MavenProject excludedProject = projects.stream()
+                // Instead of looking for the project inside the activeProjects, we should rather look inside the
+                // original list of projects. When someone excludes a project again which has been excluded by one of
+                // the earlier reactor filters (e.g. --resume-from) already, then we should not throw an error.
+                List<MavenProject> allProjects = graph.getSortedProjects();
+                MavenProject excludedProject = allProjects.stream()
                         .filter( project -> isMatchingProject( project, selector, reactorDirectory ) )
                         .findFirst()
                         .orElseThrow( () -> new MavenExecutionException( "Could not find the selected project in "
                                 + "the reactor: " + selector, request.getPom() ) );
-                result.remove( excludedProject );
+
+                boolean isExcludedProjectRemoved = result.remove( excludedProject );
+
+                if ( isExcludedProjectRemoved )
+                {
+                    List<MavenProject> children = excludedProject.getCollectedProjects();
+                    if ( children != null )
+                    {
+                        result.removeAll( children );
+                    }
+                }
             }
         }
 
