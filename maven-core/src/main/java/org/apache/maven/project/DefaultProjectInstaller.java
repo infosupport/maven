@@ -107,8 +107,8 @@ public class DefaultProjectInstaller implements ProjectInstaller
             }
             else
             {
-                throw new NoFileAssignedException( "The packaging for this project did not assign a file to the " +
-                        "build artifact" );
+                throw new NoFileAssignedException( "The packaging for this project did not assign a file to the "
+                        + "build artifact" );
             }
         }
 
