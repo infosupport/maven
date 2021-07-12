@@ -9,7 +9,7 @@ package org.apache.maven.project;
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *  http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -19,12 +19,33 @@ package org.apache.maven.project;
  * under the License.
  */
 
-import org.eclipse.aether.installation.InstallationException;
-
 /**
- * TODO: add comments
+ * This exception will be thrown if no file has been assigned to artifact.
+ * 
  */
-public interface ProjectInstaller
+public class NoFileAssignedException
+    extends Exception
 {
-    void install( ProjectBuildingRequest projectBuildingRequest ) throws InstallationException, NoFileAssignedException, ArtifactInstallerException;
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -3466983009427148332L;
+
+    /**
+     * @param message The message of the error.
+     * @param e {@link Exception}
+     */
+    public NoFileAssignedException( String message, Exception e )
+    {
+        super( message, e );
+    }
+
+    /**
+     * @param message The message.
+     */
+    public NoFileAssignedException( String message )
+    {
+        super( message );
+    }
 }
