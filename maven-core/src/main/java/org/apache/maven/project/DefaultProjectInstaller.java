@@ -19,9 +19,12 @@ package org.apache.maven.project;
  * under the License.
  */
 
+import org.apache.maven.MavenMetadataBridge;
 import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.metadata.ArtifactMetadata;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.repository.metadata.AbstractRepositoryMetadata;
 import org.apache.maven.artifact.repository.metadata.ArtifactRepositoryMetadata;
 import org.apache.maven.project.artifact.ProjectArtifact;
 import org.apache.maven.project.artifact.ProjectArtifactMetadata;
@@ -105,8 +108,8 @@ public class DefaultProjectInstaller implements ProjectInstaller
             }
             else
             {
-                throw new NoFileAssignedException( "The packaging for this project did not assign a file to the "
-                        + "build artifact" );
+                throw new NoFileAssignedException(
+                        "The packaging for this project did not assign a file to the " + "build artifact" );
             }
         }
 
@@ -144,10 +147,11 @@ public class DefaultProjectInstaller implements ProjectInstaller
                 {
                     // eaten, handled by repo system
                 }
-//                else if ( metadata instanceof GroupRepositoryMetadata )
-//                {
-                    // TODO - implement following to resolve MNG-7055?
-//                }
+                else if ( metadata instanceof AbstractRepositoryMetadata )
+                {
+                    ArtifactRepository localRepository = buildingRequest.getLocalRepository();
+                    request.addMetadata( new MavenMetadataBridge( metadata, localRepository ) );
+                }
             }
         }
 
