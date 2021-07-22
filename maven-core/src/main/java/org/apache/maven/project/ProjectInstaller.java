@@ -26,6 +26,6 @@ import org.eclipse.aether.installation.InstallationException;
  */
 public interface ProjectInstaller
 {
-    void install( ProjectBuildingRequest projectBuildingRequest )
+    void install( ProjectBuildingRequest projectBuildingRequest, MavenProject project )
             throws InstallationException, NoFileAssignedException, ArtifactInstallerException;
 }

@@ -57,15 +57,13 @@ public class DefaultProjectInstaller implements ProjectInstaller
         this.installer = installer;
     }
 
-    public void install( ProjectBuildingRequest buildingRequest )
+    public void install( final ProjectBuildingRequest buildingRequest, final MavenProject project )
             throws NoFileAssignedException, ArtifactInstallerException
     {
         if ( buildingRequest == null )
         {
             throw new IllegalArgumentException( "The parameter buildingRequest is not allowed to be null." );
         }
-
-        MavenProject project = buildingRequest.getProject();
 
         Artifact artifact = project.getArtifact();
         String packaging = project.getPackaging();
