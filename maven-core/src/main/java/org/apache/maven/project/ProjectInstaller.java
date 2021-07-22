@@ -22,7 +22,7 @@ package org.apache.maven.project;
 import org.eclipse.aether.installation.InstallationException;
 
 /**
- * TODO: add comments
+ * Responsible for installing a Maven project's artifacts.
  */
 public interface ProjectInstaller
 {

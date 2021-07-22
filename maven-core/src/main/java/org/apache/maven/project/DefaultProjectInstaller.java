@@ -41,7 +41,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * TODO: add comments
+ * Default implementation for installing Maven projects and their artifacts.
  */
 @Named
 @Singleton
