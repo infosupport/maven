@@ -24,9 +24,12 @@ import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.maven.api.model.Dependency;
 import org.apache.maven.api.model.DependencyManagement;
+import org.apache.maven.api.model.InputLocation;
+import org.apache.maven.api.model.InputSource;
 import org.apache.maven.api.model.Model;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.model.building.ModelProblemCollector;
@@ -59,15 +62,56 @@ public class DefaultDependencyManagementImporter implements DependencyManagement
                 depMgmt = DependencyManagement.newInstance();
             }
 
-            for (DependencyManagement source : sources) {
+            for (DependencyManagement source : sources) { // sources: het dependencyManagement blok
                 for (Dependency dependency : source.getDependencies()) {
                     String key = dependency.getManagementKey();
                     dependencies.putIfAbsent(key, dependency);
+
+                    if (request.isLocationTracking()) {
+                        Dependency updatedDependency = updateWithImportedFrom(dependency, source);
+                        dependencies.put(key, updatedDependency);
+                    }
                 }
             }
 
             return target.withDependencyManagement(depMgmt.withDependencies(dependencies.values()));
         }
         return target;
+    }
+
+    static Dependency updateWithImportedFrom(Dependency dependency, DependencyManagement bom) {
+        // We are only interested in the InputSource, so the location of the <dependency> element is sufficient
+        InputLocation dependencyLocation = dependency.getLocation("");
+        InputLocation bomLocation = bom.getLocation("");
+
+        if (dependencyLocation == null || bomLocation == null) {
+            return dependency;
+        }
+
+        InputSource dependencySource = dependencyLocation.getSource();
+        InputSource bomSource = bomLocation.getSource();
+
+        // TODO If the dependency and BOM have the same source, it means we found the root where the dependency is declared.
+        if (dependencySource == null
+                || bomSource == null
+                || Objects.equals(dependencySource.getModelId(), bomSource.getModelId())) {
+            return Dependency.newBuilder(dependency, true).importedFrom(bomLocation).build();
+        }
+
+        while (dependencySource.getImportedFrom() != null) {
+            InputLocation importedFrom = dependencySource.getImportedFrom();
+
+            // Stop if the BOM is already in the list, no update necessary
+            if (Objects.equals(importedFrom.getSource().getModelId(), bomSource.getModelId())) {
+                return dependency;
+            }
+
+            dependencySource = importedFrom.getSource();
+        }
+
+        // We modify the input location that is used for the whole file.
+        // This is likely correct because the POM hierarchy applies to the whole POM, not just one dependency.
+        // TODO What to do now?!
+        return Dependency.newBuilder(dependency, true).importedFrom(bomLocation).build();
     }
 }

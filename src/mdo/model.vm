@@ -127,6 +127,8 @@ public class ${class.name}
       #if ( ! $class.superClass )
     /** Locations */
     final Map<Object, InputLocation> locations;
+    /** Location tracking */
+    final InputLocation importedFrom;
       #end
     #end
 
@@ -147,7 +149,8 @@ public class ${class.name}
         $type $field.name${sep}
     #end
     #if ( $locationTracking )
-        Map<Object, InputLocation> locations
+        Map<Object, InputLocation> locations,
+        InputLocation importedFrom
     #end
     )
     {
@@ -158,7 +161,8 @@ public class ${class.name}
             ${field.name}${sep}
       #end
       #if ( $locationTracking )
-            locations
+            locations,
+            importedFrom
       #end
         );
     #end
@@ -175,6 +179,7 @@ public class ${class.name}
     #if ( $locationTracking )
       #if ( ! $class.superClass )
         this.locations = ImmutableCollections.copy( locations );
+        this.importedFrom = importedFrom;
       #end
     #end
     }
@@ -241,6 +246,14 @@ public class ${class.name}
     public InputLocation getLocation( Object key )
     {
         return locations != null ? locations.get( key ) : null;
+    }
+
+    /**
+     * Gets the input location that caused this model to be read.
+     */
+    public InputLocation getImportedFrom()
+    {
+        return importedFrom;
     }
 
     #end
@@ -380,6 +393,7 @@ public class ${class.name}
     #end
     #if ( ! $class.superClass && $locationTracking )
         Map<Object, InputLocation> locations;
+        InputLocation importedFrom;
     #end
 
         Builder( boolean withDefaults )
@@ -414,6 +428,7 @@ public class ${class.name}
     #end
     #if ( $locationTracking )
                 this.locations = base.locations;
+                this.importedFrom = base.importedFrom;
     #end
             }
             else
@@ -460,6 +475,13 @@ public class ${class.name}
             return this;
         }
 
+        @Nonnull
+        public Builder importedFrom( InputLocation importedFrom )
+        {
+            this.importedFrom = importedFrom;
+            return this;
+        }
+
     #end
         @Nonnull
         public ${class.name} build()
@@ -496,7 +518,8 @@ public class ${class.name}
       #end
     #end
     #if ( $locationTracking )
-                locations != null ? locations : ( base != null ? base.locations : null )
+                locations != null ? locations : ( base != null ? base.locations : null ),
+                importedFrom
     #end
             );
         }
