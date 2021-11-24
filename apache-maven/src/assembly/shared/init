@@ -82,9 +82,9 @@ concat_lines() {
   fi
 }
 
-# check if ci, to run in non-interactive (batch) mode
+# check if CI environment variable is true, to run in non-interactive (batch) mode
 check_if_ci() {
-    if [ "$1" == "true" ]; then
+    if [ "$1" = "true" ]; then
         echo "-B"
     fi
 }

@@ -4,8 +4,10 @@
 
 set "CLASSWORLDS_CONF=%MAVEN_HOME%\bin\m2.conf"
 
+@REM Check if CI environment variable is true, to run in non-interactive (batch) mode
+
 if "%CI%" == "true" (
-	SET "MAVEN_ARGS=-B %MAVEN_ARGS%"
+	set "MAVEN_ARGS=-B %MAVEN_ARGS%"
 )
 
 @REM Find the project basedir, i.e., the directory that contains the directory ".mvn".
@@ -26,7 +28,7 @@ if "%~1" == "-f" (
 )
 if "%~1" == "--file" (
   set "FILE_ARG=%~2"
-  shiftS
+  shift
   goto process_file_arg
 )
 @REM If none of the above, skip the argument
