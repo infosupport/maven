@@ -82,5 +82,13 @@ concat_lines() {
   fi
 }
 
+# check if ci, to run in non-interactive (batch) mode
+check_if_ci() {
+    if [ "$1" == "true" ]; then
+        echo "-B"
+    fi
+}
+
 MAVEN_PROJECTBASEDIR="`find_maven_basedir "$@"`"
 MAVEN_OPTS="`concat_lines "$MAVEN_PROJECTBASEDIR/.mvn/jvm.config"` $MAVEN_OPTS"
+MAVEN_ARGS="`check_if_ci "$CI"` $MAVEN_ARGS"

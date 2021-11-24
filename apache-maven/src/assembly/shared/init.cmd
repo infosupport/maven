@@ -4,6 +4,10 @@
 
 set "CLASSWORLDS_CONF=%MAVEN_HOME%\bin\m2.conf"
 
+if "%CI%" == "true" (
+	SET "MAVEN_ARGS=-B %MAVEN_ARGS%"
+)
+
 @REM Find the project basedir, i.e., the directory that contains the directory ".mvn".
 @REM Fallback to current working directory if not found.
 
@@ -22,7 +26,7 @@ if "%~1" == "-f" (
 )
 if "%~1" == "--file" (
   set "FILE_ARG=%~2"
-  shift
+  shiftS
   goto process_file_arg
 )
 @REM If none of the above, skip the argument
