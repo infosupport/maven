@@ -1227,6 +1227,11 @@ public class DefaultModelBuilder
                                      + ", must be \"pom\" but is \"" + parentModel.getPackaging() + "\"" )
                     .setLocation( parentModel.getLocation( "packaging" ) ) );
             }
+
+            // Set back-reference to parent reference in input model
+            InputSource parentSource = parentModel.getLocation( "" ).getSource();
+            parentSource.setReferencedFrom( parent.getLocation( "version" ) );
+            parentSource.setReferenceType( "parent" );
         }
 
         return parentData;
@@ -1510,6 +1515,11 @@ public class DefaultModelBuilder
                 }
 
                 importMgmts.add( importMgmt );
+
+                // Set back-reference to imported reference in input model
+                InputSource importedSource = importMgmt.getLocation( "" ).getSource();
+                importedSource.setReferencedFrom( dependency.getLocation( "version" ) );
+                importedSource.setReferenceType( "dependencyManagement" );
             }
         }
 

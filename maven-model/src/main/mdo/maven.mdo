@@ -3137,6 +3137,20 @@
             ]]>
           </description>
         </field>
+        <field>
+          <name>referencedFrom</name>
+          <version>4.0.0+</version>
+          <description>The InputLocation where the pom was referenced from.</description>
+          <association>
+            <type>InputLocation</type>
+            <bidi>false</bidi>
+          </association>
+        </field>
+        <field>
+          <name>referenceType</name>
+          <version>4.0.0+</version>
+          <type>String</type>
+        </field>
       </fields>
       <codeSegments>
         <codeSegment>
