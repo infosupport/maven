@@ -43,8 +43,8 @@
   |   definition of these types
   |
 -->
-<model xmlns="http://codehaus-plexus.github.io/MODELLO/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://codehaus-plexus.github.io/MODELLO/2.0.0 https://codehaus-plexus.github.io/modello/xsd/modello-2.0.0.xsd"
+<model xmlns="http://codehaus-plexus.github.io/MODELLO/2.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://codehaus-plexus.github.io/MODELLO/2.1.0 https://codehaus-plexus.github.io/modello/xsd/modello-2.1.0.xsd"
   xml.namespace="http://maven.apache.org/POM/${version}"
   xml.schemaLocation="https://maven.apache.org/xsd/maven-${version}.xsd">
   <id>maven</id>
@@ -3096,7 +3096,7 @@
         </codeSegment>
       </codeSegments>
     </class>
-    <class locationTracker="locations" java.clone="shallow">
+    <class referencedByTracker="referencedBy" locationTracker="locations" java.clone="shallow">
       <name>InputLocation</name>
       <version>4.0.0+</version>
       <fields>
