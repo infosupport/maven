@@ -43,6 +43,7 @@ import org.apache.maven.artifact.metadata.ArtifactMetadataRetrievalException;
 import org.apache.maven.artifact.metadata.ArtifactMetadataSource;
 import org.apache.maven.artifact.metadata.ResolutionGroup;
 import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.repository.LegacyLocalRepositoryManager;
 import org.apache.maven.artifact.repository.metadata.ArtifactRepositoryMetadata;
 import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.RepositoryMetadata;
@@ -63,27 +64,37 @@ import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.model.DistributionManagement;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.Relocation;
+import org.apache.maven.model.building.DefaultModelBuilderFactory;
+import org.apache.maven.model.building.DefaultModelBuildingRequest;
 import org.apache.maven.model.building.ModelBuildingException;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.model.building.ModelProblem;
+import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.resolution.UnresolvableModelException;
 import org.apache.maven.plugin.LegacySupport;
-import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.project.ProjectModelResolver;
 import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.apache.maven.properties.internal.SystemProperties;
 import org.apache.maven.repository.internal.MavenWorkspaceReader;
 import org.apache.maven.repository.legacy.metadata.DefaultMetadataResolutionRequest;
 import org.apache.maven.repository.legacy.metadata.MetadataResolutionRequest;
+import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.RequestTrace;
+import org.eclipse.aether.impl.RemoteRepositoryManager;
 import org.eclipse.aether.repository.RepositoryPolicy;
 import org.eclipse.aether.repository.WorkspaceReader;
+import org.eclipse.aether.resolution.ArtifactRequest;
+import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.transfer.ArtifactNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.maven.RepositoryUtils.toArtifact;
+import static org.apache.maven.repository.internal.ArtifactDescriptorUtils.toPomArtifact;
 
 /**
  * @author Jason van Zyl
@@ -95,22 +106,25 @@ public class MavenMetadataSource
 {
     private final Logger logger = LoggerFactory.getLogger( getClass() );
     private final RepositoryMetadataManager repositoryMetadataManager;
-    private final ArtifactFactory repositorySystem;
-    private final ProjectBuilder projectBuilder;
+    private final RemoteRepositoryManager repositoryManager;
+    private final ArtifactFactory artifactFactory;
+    private final org.eclipse.aether.RepositorySystem repositorySystem;
     private final MavenMetadataCache cache;
     private final LegacySupport legacySupport;
 
     @Inject
     public MavenMetadataSource(
             RepositoryMetadataManager repositoryMetadataManager,
-            ArtifactFactory repositorySystem,
-            ProjectBuilder projectBuilder,
+            RemoteRepositoryManager repositoryManager,
+            ArtifactFactory artifactFactory,
+            RepositorySystem repositorySystem,
             MavenMetadataCache cache,
             LegacySupport legacySupport )
     {
         this.repositoryMetadataManager = repositoryMetadataManager;
+        this.repositoryManager = repositoryManager;
+        this.artifactFactory = artifactFactory;
         this.repositorySystem = repositorySystem;
-        this.projectBuilder = projectBuilder;
         this.cache = cache;
         this.legacySupport = legacySupport;
     }
@@ -186,7 +200,7 @@ public class MavenMetadataSource
         Model model = null;
         if ( workspace instanceof MavenWorkspaceReader )
         {
-            model = ( (MavenWorkspaceReader) workspace ).findModel( RepositoryUtils.toArtifact( artifact ) );
+            model = ( (MavenWorkspaceReader) workspace ).findModel( toArtifact( artifact ) );
         }
 
         if ( model != null )
@@ -328,7 +342,7 @@ public class MavenMetadataSource
 
             ArtifactFilter inheritedFilter = ( owner != null ) ? owner.getDependencyFilter() : null;
 
-            return createDependencyArtifact( repositorySystem, dependency, inheritedScope, inheritedFilter );
+            return createDependencyArtifact( artifactFactory, dependency, inheritedScope, inheritedFilter );
         }
         catch ( InvalidVersionSpecificationException e )
         {
@@ -546,7 +560,7 @@ public class MavenMetadataSource
             project = null;
 
             pomArtifact =
-                repositorySystem.createProjectArtifact( artifact.getGroupId(),
+                artifactFactory.createProjectArtifact( artifact.getGroupId(),
                                                         artifact.getArtifactId(),
                                                         artifact.getVersion(), artifact.getScope() );
 
@@ -563,20 +577,47 @@ public class MavenMetadataSource
             {
                 try
                 {
-                    ProjectBuildingRequest configuration = new DefaultProjectBuildingRequest();
-                    configuration.setLocalRepository( repositoryRequest.getLocalRepository() );
-                    configuration.setRemoteRepositories( repositoryRequest.getRemoteRepositories() );
-                    configuration.setValidationLevel( ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL );
-                    configuration.setProcessPlugins( false );
-                    configuration.setRepositoryMerging( ProjectBuildingRequest.RepositoryMerging.REQUEST_DOMINANT );
-                    configuration.setSystemProperties( getSystemProperties() );
-                    configuration.setUserProperties( new Properties() );
-                    configuration.setRepositorySession( legacySupport.getRepositorySession() );
+                    // Resolve artifact from local repository
+                    final ArtifactRequest artifactRequest = new ArtifactRequest()
+                            .setArtifact( toPomArtifact( toArtifact( pomArtifact ) ) )
+                            .setRepositories( RepositoryUtils.toRepos( repositoryRequest.getRemoteRepositories() ) );
+                    final RepositorySystemSession session = LegacyLocalRepositoryManager.overlay(
+                                    repositoryRequest.getLocalRepository(),
+                                    legacySupport.getRepositorySession(),
+                                    repositorySystem
+                    );
+                    ArtifactResult pomResult = repositorySystem.resolveArtifact( session, artifactRequest );
 
-                    project = projectBuilder.build( pomArtifact, configuration ).getProject();
+                    // Build effective model
+                    final Properties properties = new Properties();
+                    properties.putAll( session.getUserProperties() );
+                    final DefaultModelBuildingRequest effectiveModelBuilderRequest = new DefaultModelBuildingRequest();
+                    RequestTrace trace = RequestTrace
+                            .newChild( null, repositoryRequest )
+                            .newChild( effectiveModelBuilderRequest );
+                    ModelResolver resolver
+                            = new ProjectModelResolver( session, trace, repositorySystem, repositoryManager,
+                                    RepositoryUtils.toRepos( repositoryRequest.getRemoteRepositories() ),
+                                    ProjectBuildingRequest.RepositoryMerging.REQUEST_DOMINANT, null );
+
+                    effectiveModelBuilderRequest
+                            .setPomFile( pomResult.getArtifact().getFile() )
+                            .setValidationLevel( ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL )
+                            .setProcessPlugins( false )
+                            .setSystemProperties( getSystemProperties() )
+                            .setUserProperties( properties )
+                            .setModelResolver( resolver );
+
+                    final Model effectiveModel = new DefaultModelBuilderFactory()
+                            .newInstance()
+                            .build( effectiveModelBuilderRequest )
+                            .getEffectiveModel();
+                    project = new MavenProject( effectiveModel );
                 }
-                catch ( ProjectBuildingException e )
+                catch ( ModelBuildingException | org.eclipse.aether.resolution.ArtifactResolutionException ex )
                 {
+                    ProjectBuildingException e = new ProjectBuildingException( pomArtifact.getId(),
+                            "Error resolving project artifact:", ex );
                     ModelProblem missingParentPom = hasMissingParentPom( e );
                     if ( missingParentPom != null )
                     {

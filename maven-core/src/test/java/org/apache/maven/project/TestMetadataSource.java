@@ -33,6 +33,7 @@ import org.apache.maven.artifact.repository.metadata.RepositoryMetadataManager;
 import org.apache.maven.plugin.LegacySupport;
 import org.apache.maven.project.artifact.MavenMetadataCache;
 import org.apache.maven.project.artifact.MavenMetadataSource;
+import org.eclipse.aether.impl.RemoteRepositoryManager;
 
 @SuppressWarnings( "deprecation" )
 @Named( "classpath" )
@@ -41,8 +42,10 @@ public class TestMetadataSource
     extends MavenMetadataSource
 {
 
-    public TestMetadataSource( RepositoryMetadataManager repositoryMetadataManager, ArtifactFactory repositorySystem, ProjectBuilder projectBuilder, MavenMetadataCache cache, LegacySupport legacySupport) {
-        super( repositoryMetadataManager, repositorySystem, projectBuilder, cache, legacySupport );
+    public TestMetadataSource( RepositoryMetadataManager repositoryMetadataManager, RemoteRepositoryManager repositoryManager,
+                               ArtifactFactory artifactFactory, org.eclipse.aether.RepositorySystem repositorySystem,
+                               MavenMetadataCache cache, LegacySupport legacySupport) {
+        super( repositoryMetadataManager, repositoryManager, artifactFactory, repositorySystem, cache, legacySupport );
     }
 
     @Override

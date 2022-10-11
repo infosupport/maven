@@ -26,7 +26,7 @@ import javax.inject.Singleton;
 import org.apache.maven.artifact.factory.ArtifactFactory;
 import org.apache.maven.artifact.repository.metadata.RepositoryMetadataManager;
 import org.apache.maven.plugin.LegacySupport;
-import org.apache.maven.project.ProjectBuilder;
+import org.eclipse.aether.impl.RemoteRepositoryManager;
 
 /**
  * This realizes the metadata source via the default hint to provide backward-compat with Maven 2.x whose Plexus version
@@ -42,9 +42,11 @@ public class DefaultMetadataSource
 {
     @Inject
     public DefaultMetadataSource(
-            RepositoryMetadataManager repositoryMetadataManager, ArtifactFactory repositorySystem,
-            ProjectBuilder projectBuilder, MavenMetadataCache cache, LegacySupport legacySupport )
+            RepositoryMetadataManager repositoryMetadataManager,
+            RemoteRepositoryManager repositoryManager,
+            ArtifactFactory artifactFactory, MavenMetadataCache cache,
+            org.eclipse.aether.RepositorySystem repositorySystem, LegacySupport legacySupport )
     {
-        super( repositoryMetadataManager, repositorySystem, projectBuilder, cache, legacySupport );
+        super( repositoryMetadataManager, repositoryManager, artifactFactory, repositorySystem, cache, legacySupport );
     }
 }
