@@ -91,7 +91,7 @@ public class DefaultDependencyManagementImporter implements DependencyManagement
         InputSource dependencySource = dependencyLocation.getSource();
         InputSource bomSource = bomLocation.getSource();
 
-        // TODO If the dependency and BOM have the same source, it means we found the root where the dependency is declared.
+        // If the dependency and BOM have the same source, it means we found the root where the dependency is declared.
         if (dependencySource == null
                 || bomSource == null
                 || Objects.equals(dependencySource.getModelId(), bomSource.getModelId())) {
