@@ -26,7 +26,7 @@ import org.apache.maven.model.building.DefaultModelBuildingRequest;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.model.building.SimpleProblemCollector;
 import org.apache.maven.model.interpolation.DefaultModelVersionProcessor;
-import org.apache.maven.model.v4.MavenXpp3Reader;
+import org.apache.maven.model.v4.MavenStaxReader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * @author <a href="mailto:trygvis@inamo.no">Trygve Laugst&oslash;l</a>
  */
 class DefaultModelValidatorTest {
 
@@ -44,9 +43,10 @@ class DefaultModelValidatorTest {
 
     private Model read(String pom) throws Exception {
         String resource = "/poms/validation/" + pom;
-        InputStream is = getClass().getResourceAsStream(resource);
-        assertNotNull(is, "missing resource: " + resource);
-        return new Model(new MavenXpp3Reader().read(is));
+        try (InputStream is = getClass().getResourceAsStream(resource)) {
+            assertNotNull(is, "missing resource: " + resource);
+            return new Model(new MavenStaxReader().read(is));
+        }
     }
 
     private SimpleProblemCollector validate(String pom) throws Exception {
@@ -120,6 +120,16 @@ class DefaultModelValidatorTest {
         assertViolations(result, 1, 0, 0);
 
         assertTrue(result.getFatals().get(0).contains("modelVersion"));
+    }
+
+    @Test
+    void testModelVersionMessage() throws Exception {
+        SimpleProblemCollector result =
+                validateRaw("modelVersion-4_0.xml", ModelBuildingRequest.VALIDATION_LEVEL_STRICT);
+
+        assertViolations(result, 0, 1, 0);
+
+        assertTrue(result.getErrors().get(0).contains("'modelVersion' must be one of"));
     }
 
     @Test
@@ -804,5 +814,29 @@ class DefaultModelValidatorTest {
     void repositoryWithBasedirExpression() throws Exception {
         SimpleProblemCollector result = validateRaw("raw-model/repository-with-basedir-expression.xml");
         assertViolations(result, 0, 0, 0);
+    }
+
+    @Test
+    void profileActivationWithAllowedExpression() throws Exception {
+        SimpleProblemCollector result = validateRaw("raw-model/profile-activation-file-with-allowed-expressions.xml");
+        assertViolations(result, 0, 0, 0);
+    }
+
+    @Test
+    void profileActivationWithProjectExpression() throws Exception {
+        SimpleProblemCollector result = validateRaw("raw-model/profile-activation-file-with-project-expressions.xml");
+        assertViolations(result, 0, 0, 2);
+
+        assertEquals(
+                "'profiles.profile[exists-project-version].activation.file.exists' "
+                        + "Failed to interpolate file location ${project.version}/test.txt: "
+                        + "${project.version} expressions are not supported during profile activation.",
+                result.getWarnings().get(0));
+
+        assertEquals(
+                "'profiles.profile[missing-project-version].activation.file.missing' "
+                        + "Failed to interpolate file location ${project.version}/test.txt: "
+                        + "${project.version} expressions are not supported during profile activation.",
+                result.getWarnings().get(1));
     }
 }

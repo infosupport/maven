@@ -22,63 +22,59 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.*;
 
 import org.apache.maven.RepositoryUtils;
-import org.apache.maven.SessionScoped;
-import org.apache.maven.api.Artifact;
-import org.apache.maven.api.Node;
-import org.apache.maven.api.Project;
-import org.apache.maven.api.RemoteRepository;
-import org.apache.maven.api.ResolutionScope;
-import org.apache.maven.api.Scope;
-import org.apache.maven.api.Session;
+import org.apache.maven.api.*;
 import org.apache.maven.api.annotations.Nonnull;
-import org.apache.maven.api.services.ArtifactManager;
-import org.apache.maven.api.services.MavenException;
-import org.apache.maven.api.services.ProjectManager;
-import org.apache.maven.lifecycle.LifecycleExecutionException;
-import org.apache.maven.lifecycle.internal.LifecycleDependencyResolver;
+import org.apache.maven.api.di.SessionScoped;
+import org.apache.maven.api.model.Resource;
+import org.apache.maven.api.services.*;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.PlexusContainer;
-import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
+import org.eclipse.sisu.Typed;
+
+import static org.apache.maven.internal.impl.Utils.map;
 
 @Named
+@Typed
 @SessionScoped
 public class DefaultProjectManager implements ProjectManager {
 
-    private final Session session;
+    private final InternalSession session;
     private final ArtifactManager artifactManager;
-    private final PlexusContainer container;
 
     @Inject
-    public DefaultProjectManager(Session session, ArtifactManager artifactManager, PlexusContainer container) {
+    public DefaultProjectManager(InternalSession session, ArtifactManager artifactManager) {
         this.session = session;
         this.artifactManager = artifactManager;
-        this.container = container;
     }
 
     @Nonnull
     @Override
     public Optional<Path> getPath(Project project) {
-        // TODO: apiv4
-        throw new UnsupportedOperationException("Not implemented yet");
+        Optional<Artifact> mainArtifact = project.getMainArtifact();
+        if (mainArtifact.isPresent()) {
+            return artifactManager.getPath(mainArtifact.get());
+        }
+        return Optional.empty();
     }
 
     @Nonnull
     @Override
     public Collection<Artifact> getAttachedArtifacts(Project project) {
-        AbstractSession session = ((DefaultProject) project).getSession();
-        Collection<Artifact> attached = getMavenProject(project).getAttachedArtifacts().stream()
-                .map(RepositoryUtils::toArtifact)
-                .map(session::getArtifact)
-                .collect(Collectors.toList());
+        InternalSession session = ((DefaultProject) project).getSession();
+        Collection<Artifact> attached = map(
+                getMavenProject(project).getAttachedArtifacts(),
+                a -> session.getArtifact(RepositoryUtils.toArtifact(a)));
         return Collections.unmodifiableCollection(attached);
+    }
+
+    @Override
+    public Collection<Artifact> getAllArtifacts(Project project) {
+        ArrayList<Artifact> result = new ArrayList<>(2);
+        result.addAll(project.getArtifacts());
+        result.addAll(getAttachedArtifacts(project));
+        return Collections.unmodifiableCollection(result);
     }
 
     @Override
@@ -114,49 +110,63 @@ public class DefaultProjectManager implements ProjectManager {
     }
 
     @Override
-    public List<RemoteRepository> getRepositories(Project project) {
-        // TODO: apiv4
-        throw new UnsupportedOperationException("Not implemented yet");
+    public List<Resource> getResources(Project project) {
+        return getMavenProject(project).getBuild().getDelegate().getResources();
     }
 
     @Override
-    public List<Artifact> getResolvedDependencies(Project project, ResolutionScope scope) {
-        Collection<String> toResolve = toScopes(scope);
-        try {
-            LifecycleDependencyResolver lifecycleDependencyResolver =
-                    container.lookup(LifecycleDependencyResolver.class);
-            Set<org.apache.maven.artifact.Artifact> artifacts = lifecycleDependencyResolver.resolveProjectArtifacts(
-                    getMavenProject(project),
-                    toResolve,
-                    toResolve,
-                    ((DefaultSession) session).getMavenSession(),
-                    false,
-                    Collections.emptySet());
-            return artifacts.stream()
-                    .map(RepositoryUtils::toArtifact)
-                    .map(((DefaultSession) session)::getArtifact)
-                    .collect(Collectors.toList());
-        } catch (LifecycleExecutionException | ComponentLookupException e) {
-            throw new MavenException("Unable to resolve project dependencies", e);
-        }
+    public void addResource(Project project, Resource resource) {
+        getMavenProject(project).addResource(new org.apache.maven.model.Resource(resource));
     }
 
     @Override
-    public Node getCollectedDependencies(Project project, ResolutionScope scope) {
-        // TODO: apiv4
-        throw new UnsupportedOperationException("Not implemented yet");
+    public List<Resource> getTestResources(Project project) {
+        return getMavenProject(project).getBuild().getDelegate().getTestResources();
+    }
+
+    @Override
+    public void addTestResource(Project project, Resource resource) {
+        getMavenProject(project).addTestResource(new org.apache.maven.model.Resource(resource));
+    }
+
+    @Override
+    public List<RemoteRepository> getRemoteProjectRepositories(Project project) {
+        return Collections.unmodifiableList(new MappedList<>(
+                ((DefaultProject) project).getProject().getRemoteProjectRepositories(), session::getRemoteRepository));
+    }
+
+    @Override
+    public List<RemoteRepository> getRemotePluginRepositories(Project project) {
+        return Collections.unmodifiableList(new MappedList<>(
+                ((DefaultProject) project).getProject().getRemotePluginRepositories(), session::getRemoteRepository));
     }
 
     @Override
     public void setProperty(Project project, String key, String value) {
-        getMavenProject(project).getProperties().setProperty(key, value);
+        Properties properties = getMavenProject(project).getProperties();
+        if (value == null) {
+            properties.remove(key);
+        } else {
+            properties.setProperty(key, value);
+        }
+    }
+
+    @Override
+    public Map<String, String> getProperties(Project project) {
+        return Collections.unmodifiableMap(
+                new PropertiesAsMap(((DefaultProject) project).getProject().getProperties()));
+    }
+
+    @Override
+    public Optional<Project> getExecutionProject(Project project) {
+        // Session keep tracks of the Project per project id,
+        // so we cannot use session.getProject(p) for forked projects
+        // which are temporary clones
+        return Optional.ofNullable(getMavenProject(project).getExecutionProject())
+                .map(p -> new DefaultProject(session, p));
     }
 
     private MavenProject getMavenProject(Project project) {
         return ((DefaultProject) project).getProject();
-    }
-
-    private Collection<String> toScopes(ResolutionScope scope) {
-        return scope.scopes().stream().map(Scope::id).collect(Collectors.toList());
     }
 }

@@ -23,15 +23,15 @@ import org.apache.maven.api.annotations.Nonnull;
 public interface Dependency extends Artifact {
 
     /**
-     * The artifact type.
+     * The dependency type.
      *
-     * @return the artifact type, never {@code null}
+     * @return the dependency type, never {@code null}
      */
     @Nonnull
     Type getType();
 
     @Nonnull
-    Scope getScope();
+    DependencyScope getScope();
 
     boolean isOptional();
 

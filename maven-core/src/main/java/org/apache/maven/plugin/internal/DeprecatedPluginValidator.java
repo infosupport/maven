@@ -22,26 +22,29 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
+import org.apache.maven.api.services.MessageBuilderFactory;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.PluginValidationManager;
 import org.apache.maven.plugin.descriptor.MojoDescriptor;
 import org.apache.maven.plugin.descriptor.Parameter;
-import org.apache.maven.shared.utils.logging.MessageUtils;
 import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluator;
 import org.codehaus.plexus.configuration.PlexusConfiguration;
 
 /**
  * Print warnings if deprecated mojo or parameters of plugin are used in configuration.
  *
- * @author Slawomir Jaranowski
  */
 @Singleton
 @Named
 class DeprecatedPluginValidator extends AbstractMavenPluginDescriptorSourcedParametersValidator {
 
+    private final MessageBuilderFactory messageBuilderFactory;
+
     @Inject
-    DeprecatedPluginValidator(PluginValidationManager pluginValidationManager) {
+    DeprecatedPluginValidator(
+            PluginValidationManager pluginValidationManager, MessageBuilderFactory messageBuilderFactory) {
         super(pluginValidationManager);
+        this.messageBuilderFactory = messageBuilderFactory;
     }
 
     @Override
@@ -94,7 +97,8 @@ class DeprecatedPluginValidator extends AbstractMavenPluginDescriptorSourcedPara
     }
 
     private String logDeprecatedMojo(MojoDescriptor mojoDescriptor) {
-        return MessageUtils.buffer()
+        return messageBuilderFactory
+                .builder()
                 .warning("Goal '")
                 .warning(mojoDescriptor.getGoal())
                 .warning("' is deprecated: ")

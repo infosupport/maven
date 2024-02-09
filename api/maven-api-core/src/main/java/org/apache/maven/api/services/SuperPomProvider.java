@@ -20,6 +20,7 @@ package org.apache.maven.api.services;
 
 import org.apache.maven.api.Service;
 import org.apache.maven.api.annotations.Experimental;
+import org.apache.maven.api.annotations.Nonnull;
 import org.apache.maven.api.model.Model;
 
 /**
@@ -33,7 +34,8 @@ public interface SuperPomProvider extends Service {
      *
      * @param version The model version to retrieve the super POM for (e.g. "4.0.0"), must not be {@code null}.
      * @return The super POM, never {@code null}.
-     * @throws IllegalStateException if the super POM could not be retrieved
+     * @throws SuperPomProviderException if the super POM could not be retrieved
      */
-    Model getSuperPom(String version);
+    @Nonnull
+    Model getSuperPom(@Nonnull String version);
 }

@@ -31,7 +31,6 @@ import org.apache.maven.artifact.versioning.OverConstrainedVersionException;
 import org.apache.maven.artifact.versioning.VersionRange;
 
 /**
- * @author Jason van Zyl
  */
 public class DefaultArtifact implements Artifact {
     private String groupId;
@@ -89,6 +88,26 @@ public class DefaultArtifact implements Artifact {
                 classifier,
                 artifactHandler,
                 false);
+    }
+
+    public DefaultArtifact(
+            String groupId,
+            String artifactId,
+            String version,
+            String scope,
+            String type,
+            String classifier,
+            ArtifactHandler artifactHandler,
+            boolean optional) {
+        this(
+                groupId,
+                artifactId,
+                VersionRange.createFromVersion(version),
+                scope,
+                type,
+                classifier,
+                artifactHandler,
+                optional);
     }
 
     public DefaultArtifact(

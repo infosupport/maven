@@ -45,7 +45,6 @@ import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.aether.transfer.TransferListener;
 
 /**
- * @author Jason van Zyl
  */
 public class DefaultMavenExecutionRequest implements MavenExecutionRequest {
 
@@ -66,6 +65,12 @@ public class DefaultMavenExecutionRequest implements MavenExecutionRequest {
     private boolean cacheTransferError = false;
 
     private boolean cacheNotFound = false;
+
+    private boolean ignoreMissingArtifactDescriptor = true;
+
+    private boolean ignoreInvalidArtifactDescriptor = true;
+
+    private boolean ignoreTransitiveRepositories;
 
     private List<Proxy> proxies;
 
@@ -89,6 +94,8 @@ public class DefaultMavenExecutionRequest implements MavenExecutionRequest {
     // ----------------------------------------------------------------------------
 
     private File userSettingsFile;
+
+    private File projectSettingsFile;
 
     private File globalSettingsFile;
 
@@ -173,6 +180,9 @@ public class DefaultMavenExecutionRequest implements MavenExecutionRequest {
         copy.setInteractiveMode(original.isInteractiveMode());
         copy.setCacheNotFound(original.isCacheNotFound());
         copy.setCacheTransferError(original.isCacheTransferError());
+        copy.setIgnoreMissingArtifactDescriptor(original.isIgnoreMissingArtifactDescriptor());
+        copy.setIgnoreInvalidArtifactDescriptor(original.isIgnoreInvalidArtifactDescriptor());
+        copy.setIgnoreTransitiveRepositories(original.isIgnoreTransitiveRepositories());
         copy.setProxies(original.getProxies());
         copy.setServers(original.getServers());
         copy.setMirrors(original.getMirrors());
@@ -843,6 +853,18 @@ public class DefaultMavenExecutionRequest implements MavenExecutionRequest {
     }
 
     @Override
+    public File getProjectSettingsFile() {
+        return projectSettingsFile;
+    }
+
+    @Override
+    public MavenExecutionRequest setProjectSettingsFile(File projectSettingsFile) {
+        this.projectSettingsFile = projectSettingsFile;
+
+        return this;
+    }
+
+    @Override
     public File getGlobalSettingsFile() {
         return globalSettingsFile;
     }
@@ -1018,6 +1040,39 @@ public class DefaultMavenExecutionRequest implements MavenExecutionRequest {
     @Override
     public MavenExecutionRequest setCacheNotFound(boolean cacheNotFound) {
         this.cacheNotFound = cacheNotFound;
+        return this;
+    }
+
+    @Override
+    public boolean isIgnoreMissingArtifactDescriptor() {
+        return ignoreMissingArtifactDescriptor;
+    }
+
+    @Override
+    public MavenExecutionRequest setIgnoreMissingArtifactDescriptor(boolean ignoreMissing) {
+        this.ignoreMissingArtifactDescriptor = ignoreMissing;
+        return this;
+    }
+
+    @Override
+    public boolean isIgnoreInvalidArtifactDescriptor() {
+        return ignoreInvalidArtifactDescriptor;
+    }
+
+    @Override
+    public boolean isIgnoreTransitiveRepositories() {
+        return ignoreTransitiveRepositories;
+    }
+
+    @Override
+    public MavenExecutionRequest setIgnoreInvalidArtifactDescriptor(boolean ignoreInvalid) {
+        this.ignoreInvalidArtifactDescriptor = ignoreInvalid;
+        return this;
+    }
+
+    @Override
+    public MavenExecutionRequest setIgnoreTransitiveRepositories(boolean ignoreTransitiveRepositories) {
+        this.ignoreTransitiveRepositories = ignoreTransitiveRepositories;
         return this;
     }
 

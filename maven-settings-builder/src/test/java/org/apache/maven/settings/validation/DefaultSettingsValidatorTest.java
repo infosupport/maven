@@ -37,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * @author mkleint
  */
 class DefaultSettingsValidatorTest {
 
@@ -67,7 +66,7 @@ class DefaultSettingsValidatorTest {
         validator.validate(model, problems);
         assertEquals(0, problems.messages.size());
 
-        Repository repo = new Repository();
+        Repository repo = new Repository(org.apache.maven.api.settings.Repository.newInstance(false));
         prof.addRepository(repo);
         problems = new SimpleProblemCollector();
         validator.validate(model, problems);

@@ -62,7 +62,7 @@ public interface ArtifactCoordinate {
      * @return the version
      */
     @Nonnull
-    VersionRange getVersion();
+    VersionConstraint getVersion();
 
     /**
      * The extension of the artifact.
@@ -75,6 +75,7 @@ public interface ArtifactCoordinate {
     /**
      * Unique id identifying this artifact
      */
+    @Nonnull
     default String getId() {
         return getGroupId()
                 + ":" + getArtifactId()

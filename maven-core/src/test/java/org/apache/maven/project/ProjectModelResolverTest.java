@@ -24,11 +24,11 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.maven.artifact.InvalidRepositoryException;
+import org.apache.maven.bridge.MavenRepositorySystem;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Parent;
 import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.resolution.UnresolvableModelException;
-import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.impl.RemoteRepositoryManager;
@@ -45,7 +45,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Test cases for the project {@code ModelResolver} implementation.
  *
- * @author Christian Schulte
  * @since 3.5.0
  */
 class ProjectModelResolverTest extends AbstractMavenProjectTestCase {
@@ -191,7 +190,7 @@ class ProjectModelResolverTest extends AbstractMavenProjectTestCase {
 
     private ModelResolver newModelResolver() throws Exception {
         final File localRepo = new File(this.getLocalRepository().getBasedir());
-        final DefaultRepositorySystemSession repoSession = MavenRepositorySystemUtils.newSession();
+        final DefaultRepositorySystemSession repoSession = new DefaultRepositorySystemSession(h -> false);
         repoSession.setLocalRepositoryManager(new LegacyLocalRepositoryManager(localRepo));
 
         return new ProjectModelResolver(
@@ -207,7 +206,7 @@ class ProjectModelResolverTest extends AbstractMavenProjectTestCase {
     private List<RemoteRepository> getRemoteRepositories() throws InvalidRepositoryException {
         final File repoDir = new File(getBasedir(), "src/test/remote-repo").getAbsoluteFile();
         final RemoteRepository remoteRepository = new RemoteRepository.Builder(
-                        org.apache.maven.repository.RepositorySystem.DEFAULT_REMOTE_REPO_ID,
+                        MavenRepositorySystem.DEFAULT_REMOTE_REPO_ID,
                         "default",
                         repoDir.toURI().toASCIIString())
                 .build();

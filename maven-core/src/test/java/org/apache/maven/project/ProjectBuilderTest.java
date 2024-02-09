@@ -105,7 +105,7 @@ class ProjectBuilderTest extends AbstractCoreMavenComponentTestCase {
                 e.getResults(),
                 contains(projectBuildingResultWithProblemMessage(
                         "'dependencies.dependency.version' for org.apache.maven.its:a:jar is missing")));
-        assertThat(e.getResults(), contains(projectBuildingResultWithLocation(17, 9)));
+        assertThat(e.getResults(), contains(projectBuildingResultWithLocation(5, 9)));
     }
 
     @Test
@@ -192,8 +192,9 @@ class ProjectBuilderTest extends AbstractCoreMavenComponentTestCase {
 
     @Test
     void testReadErroneousMavenProjectContainsReference() throws Exception {
-        File pomFile = new File("src/test/resources/projects/artifactMissingVersion.xml").getAbsoluteFile();
+        File pomFile = new File("src/test/resources/projects/artifactMissingVersion/pom.xml").getAbsoluteFile();
         MavenSession mavenSession = createMavenSession(null);
+        mavenSession.getRequest().setRootDirectory(pomFile.getParentFile().toPath());
         ProjectBuildingRequest configuration = new DefaultProjectBuildingRequest();
         configuration.setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
         configuration.setRepositorySession(mavenSession.getRepositorySession());
@@ -227,14 +228,14 @@ class ProjectBuilderTest extends AbstractCoreMavenComponentTestCase {
         File pomFile = new File("src/test/resources/projects/badPom.xml").getAbsoluteFile();
         MavenSession mavenSession = createMavenSession(null);
         ProjectBuildingRequest configuration = new DefaultProjectBuildingRequest();
-        configuration.setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
+        configuration.setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_STRICT);
         configuration.setRepositorySession(mavenSession.getRepositorySession());
         org.apache.maven.project.ProjectBuilder projectBuilder =
                 getContainer().lookup(org.apache.maven.project.ProjectBuilder.class);
 
         // single project build entry point
         Exception ex = assertThrows(Exception.class, () -> projectBuilder.build(pomFile, configuration));
-        assertThat(ex.getMessage(), containsString("expected START_TAG or END_TAG not TEXT"));
+        assertThat(ex.getMessage(), containsString("Received non-all-whitespace CHARACTERS or CDATA event"));
 
         // multi projects build entry point
         ProjectBuildingException pex = assertThrows(
@@ -245,7 +246,8 @@ class ProjectBuilderTest extends AbstractCoreMavenComponentTestCase {
         assertThat(pex.getResults().get(0).getProblems().size(), greaterThan(0));
         assertThat(
                 pex.getResults(),
-                contains(projectBuildingResultWithProblemMessage("expected START_TAG or END_TAG not TEXT")));
+                contains(projectBuildingResultWithProblemMessage(
+                        "Received non-all-whitespace CHARACTERS or CDATA event in nextTag()")));
     }
 
     @Test

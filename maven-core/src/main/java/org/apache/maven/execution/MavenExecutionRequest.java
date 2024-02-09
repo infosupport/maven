@@ -40,7 +40,6 @@ import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.aether.transfer.TransferListener;
 
 /**
- * @author Jason van Zyl
  */
 public interface MavenExecutionRequest {
     // ----------------------------------------------------------------------
@@ -286,6 +285,36 @@ public interface MavenExecutionRequest {
 
     MavenExecutionRequest setCacheNotFound(boolean cacheNotFound);
 
+    /**
+     * @since 4.0.0
+     */
+    boolean isIgnoreMissingArtifactDescriptor();
+
+    /**
+     * @since 4.0.0
+     */
+    MavenExecutionRequest setIgnoreMissingArtifactDescriptor(boolean ignoreMissing);
+
+    /**
+     * @since 4.0.0
+     */
+    boolean isIgnoreInvalidArtifactDescriptor();
+
+    /**
+     * @since 4.0.0
+     */
+    MavenExecutionRequest setIgnoreInvalidArtifactDescriptor(boolean ignoreInvalid);
+
+    /**
+     * @since 4.0.0
+     */
+    boolean isIgnoreTransitiveRepositories();
+
+    /**
+     * @since 4.0.0
+     */
+    MavenExecutionRequest setIgnoreTransitiveRepositories(boolean ignoreTransitiveRepositories);
+
     // Profiles
     List<Profile> getProfiles();
 
@@ -392,6 +421,10 @@ public interface MavenExecutionRequest {
     File getUserSettingsFile();
 
     MavenExecutionRequest setUserSettingsFile(File userSettingsFile);
+
+    File getProjectSettingsFile();
+
+    MavenExecutionRequest setProjectSettingsFile(File projectSettingsFile);
 
     File getGlobalSettingsFile();
 

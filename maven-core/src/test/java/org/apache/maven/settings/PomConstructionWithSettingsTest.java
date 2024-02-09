@@ -19,23 +19,23 @@
 package org.apache.maven.settings;
 
 import javax.inject.Inject;
+import javax.xml.stream.XMLStreamException;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Reader;
+import java.io.InputStream;
+import java.nio.file.Files;
 
+import org.apache.maven.api.settings.InputSource;
 import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
+import org.apache.maven.bridge.MavenRepositorySystem;
 import org.apache.maven.model.Profile;
 import org.apache.maven.project.DefaultProjectBuilder;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.harness.PomTestWrapper;
-import org.apache.maven.repository.RepositorySystem;
-import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
-import org.apache.maven.settings.io.xpp3.SettingsXpp3Reader;
+import org.apache.maven.settings.v4.SettingsStaxReader;
 import org.codehaus.plexus.testing.PlexusTest;
-import org.codehaus.plexus.util.ReaderFactory;
-import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.internal.impl.SimpleLocalRepositoryManagerFactory;
 import org.eclipse.aether.repository.LocalRepository;
@@ -55,7 +55,7 @@ class PomConstructionWithSettingsTest {
     private DefaultProjectBuilder projectBuilder;
 
     @Inject
-    private RepositorySystem repositorySystem;
+    private MavenRepositorySystem repositorySystem;
 
     private File testDirectory;
 
@@ -110,7 +110,7 @@ class PomConstructionWithSettingsTest {
                 "local", localRepoUrl, new DefaultRepositoryLayout(), null, null));
         config.setActiveProfileIds(settings.getActiveProfiles());
 
-        DefaultRepositorySystemSession repoSession = MavenRepositorySystemUtils.newSession();
+        DefaultRepositorySystemSession repoSession = new DefaultRepositorySystemSession(h -> false);
         LocalRepository localRepo =
                 new LocalRepository(config.getLocalRepository().getBasedir());
         repoSession.setLocalRepositoryManager(
@@ -120,14 +120,11 @@ class PomConstructionWithSettingsTest {
         return new PomTestWrapper(pomFile, projectBuilder.build(pomFile, config).getProject());
     }
 
-    private static Settings readSettingsFile(File settingsFile) throws IOException, XmlPullParserException {
-        Settings settings = null;
-
-        try (Reader reader = ReaderFactory.newXmlReader(settingsFile)) {
-            SettingsXpp3Reader modelReader = new SettingsXpp3Reader();
-
-            settings = modelReader.read(reader);
+    private static Settings readSettingsFile(File settingsFile) throws IOException, XMLStreamException {
+        try (InputStream is = Files.newInputStream(settingsFile.toPath())) {
+            SettingsStaxReader reader = new SettingsStaxReader();
+            InputSource source = new InputSource(settingsFile.toString());
+            return new Settings(reader.read(is, true, source));
         }
-        return settings;
     }
 }

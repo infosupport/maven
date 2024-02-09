@@ -45,7 +45,6 @@ import org.apache.maven.plugin.version.PluginVersionRequest;
 import org.apache.maven.plugin.version.PluginVersionResolutionException;
 import org.apache.maven.plugin.version.PluginVersionResolver;
 import org.apache.maven.plugin.version.PluginVersionResult;
-import org.codehaus.plexus.util.StringUtils;
 import org.eclipse.aether.RepositoryEvent;
 import org.eclipse.aether.RepositoryEvent.EventType;
 import org.eclipse.aether.RepositoryListener;
@@ -68,7 +67,6 @@ import org.slf4j.LoggerFactory;
  * Resolves a version for a plugin.
  *
  * @since 3.0
- * @author Benjamin Bentmann
  */
 @Named
 @Singleton
@@ -107,19 +105,29 @@ public class DefaultPluginVersionResolver implements PluginVersionResolver {
             if (result == null) {
                 result = resolveFromRepository(request);
 
-                if (logger.isDebugEnabled()) {
-                    logger.debug("Resolved plugin version for " + request.getGroupId() + ":" + request.getArtifactId()
-                            + " to " + result.getVersion() + " from repository " + result.getRepository());
-                }
+                logger.debug(
+                        "Resolved plugin version for {}:{} to {} from repository {}",
+                        request.getGroupId(),
+                        request.getArtifactId(),
+                        result.getVersion(),
+                        result.getRepository());
 
                 cache.putIfAbsent(key, result);
-            } else if (logger.isDebugEnabled()) {
-                logger.debug("Reusing cached resolved plugin version for " + request.getGroupId() + ":"
-                        + request.getArtifactId() + " to " + result.getVersion() + " from POM " + request.getPom());
+            } else {
+                logger.debug(
+                        "Reusing cached resolved plugin version for {}:{} to {} from POM {}",
+                        request.getGroupId(),
+                        request.getArtifactId(),
+                        result.getVersion(),
+                        request.getPom());
             }
-        } else if (logger.isDebugEnabled()) {
-            logger.debug("Resolved plugin version for " + request.getGroupId() + ":" + request.getArtifactId() + " to "
-                    + result.getVersion() + " from POM " + request.getPom());
+        } else {
+            logger.debug(
+                    "Reusing cached resolved plugin version for {}:{} to {} from POM {}",
+                    request.getGroupId(),
+                    request.getArtifactId(),
+                    result.getVersion(),
+                    request.getPom());
         }
 
         return result;
@@ -244,7 +252,7 @@ public class DefaultPluginVersionResolver implements PluginVersionResolver {
             pluginDescriptor = pluginManager.getPluginDescriptor(
                     plugin, request.getRepositories(), request.getRepositorySession());
         } catch (PluginResolutionException e) {
-            logger.debug("Ignoring unresolvable plugin version " + version, e);
+            logger.debug("Ignoring unresolvable plugin version {}", version, e);
             return false;
         } catch (Exception e) {
             // ignore for now and delay failure to higher level processing
@@ -254,7 +262,7 @@ public class DefaultPluginVersionResolver implements PluginVersionResolver {
         try {
             pluginManager.checkPrerequisites(pluginDescriptor);
         } catch (Exception e) {
-            logger.warn("Ignoring incompatible plugin version " + version, e);
+            logger.warn("Ignoring incompatible plugin version {}", version, e);
             return false;
         }
 
@@ -300,15 +308,21 @@ public class DefaultPluginVersionResolver implements PluginVersionResolver {
     private void mergeMetadata(Versions versions, Metadata source, ArtifactRepository repository) {
         Versioning versioning = source.getVersioning();
         if (versioning != null) {
-            String timestamp = StringUtils.clean(versioning.getLastUpdated());
+            String timestamp = versioning.getLastUpdated() == null
+                    ? ""
+                    : versioning.getLastUpdated().trim();
 
-            if (StringUtils.isNotEmpty(versioning.getRelease()) && timestamp.compareTo(versions.releaseTimestamp) > 0) {
+            if (versioning.getRelease() != null
+                    && !versioning.getRelease().isEmpty()
+                    && timestamp.compareTo(versions.releaseTimestamp) > 0) {
                 versions.releaseVersion = versioning.getRelease();
                 versions.releaseTimestamp = timestamp;
                 versions.releaseRepository = repository;
             }
 
-            if (StringUtils.isNotEmpty(versioning.getLatest()) && timestamp.compareTo(versions.latestTimestamp) > 0) {
+            if (versioning.getLatest() != null
+                    && !versioning.getLatest().isEmpty()
+                    && timestamp.compareTo(versions.latestTimestamp) > 0) {
                 versions.latestVersion = versioning.getLatest();
                 versions.latestTimestamp = timestamp;
                 versions.latestRepository = repository;

@@ -24,23 +24,24 @@ import java.util.Collections;
 import org.apache.maven.execution.DefaultMavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.root.RootLocator;
-import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
+import org.eclipse.aether.DefaultRepositorySystemSession;
+import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.internal.impl.DefaultRepositorySystem;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 
 public class DefaultSessionTest {
 
     @Test
     void testRootDirectoryWithNull() {
-        RepositorySystemSession rss = MavenRepositorySystemUtils.newSession();
+        RepositorySystemSession rss = new DefaultRepositorySystemSession(h -> false);
         DefaultMavenExecutionRequest mer = new DefaultMavenExecutionRequest();
         MavenSession ms = new MavenSession(null, rss, mer, null);
         DefaultSession session =
-                new DefaultSession(ms, new DefaultRepositorySystem(), Collections.emptyList(), null, null, null);
+                new DefaultSession(ms, mock(RepositorySystem.class), Collections.emptyList(), null, null, null);
 
         assertEquals(
                 RootLocator.UNABLE_TO_FIND_ROOT_PROJECT_MESSAGE,
@@ -50,12 +51,12 @@ public class DefaultSessionTest {
 
     @Test
     void testRootDirectory() {
-        RepositorySystemSession rss = MavenRepositorySystemUtils.newSession();
+        RepositorySystemSession rss = new DefaultRepositorySystemSession(h -> false);
         DefaultMavenExecutionRequest mer = new DefaultMavenExecutionRequest();
         MavenSession ms = new MavenSession(null, rss, mer, null);
         ms.getRequest().setRootDirectory(Paths.get("myRootDirectory"));
         DefaultSession session =
-                new DefaultSession(ms, new DefaultRepositorySystem(), Collections.emptyList(), null, null, null);
+                new DefaultSession(ms, mock(RepositorySystem.class), Collections.emptyList(), null, null, null);
 
         assertEquals(Paths.get("myRootDirectory"), session.getRootDirectory());
     }

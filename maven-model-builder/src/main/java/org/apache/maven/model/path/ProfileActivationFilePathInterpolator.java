@@ -36,7 +36,6 @@ import org.codehaus.plexus.interpolation.RegexBasedInterpolator;
 /**
  * Finds an absolute path for {@link ActivationFile#getExists()} or {@link ActivationFile#getMissing()}
  *
- * @author Ravil Galeyev
  */
 @Named
 @Singleton
@@ -70,11 +69,7 @@ public class ProfileActivationFilePathInterpolator {
             interpolator.addValueSource(new AbstractValueSource(false) {
                 @Override
                 public Object getValue(String expression) {
-                    /*
-                     * We intentionally only support ${basedir} and not ${project.basedir} as the latter form
-                     * would suggest that other project.* expressions can be used which is beyond the design.
-                     */
-                    if ("basedir".equals(expression)) {
+                    if ("basedir".equals(expression) || "project.basedir".equals(expression)) {
                         return basedir.getAbsolutePath();
                     }
                     return null;

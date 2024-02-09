@@ -27,12 +27,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.maven.artifact.InvalidRepositoryException;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.bridge.MavenRepositorySystem;
-import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.settings.Mirror;
 import org.apache.maven.settings.Proxy;
 import org.apache.maven.settings.Repository;
@@ -84,10 +82,6 @@ public class DefaultMavenExecutionRequestPopulator implements MavenExecutionRequ
 
         populateDefaultPluginGroups(request);
 
-        injectDefaultRepositories(request);
-
-        injectDefaultPluginRepositories(request);
-
         return request;
     }
 
@@ -98,32 +92,6 @@ public class DefaultMavenExecutionRequestPopulator implements MavenExecutionRequ
     private void populateDefaultPluginGroups(MavenExecutionRequest request) {
         request.addPluginGroup("org.apache.maven.plugins");
         request.addPluginGroup("org.codehaus.mojo");
-    }
-
-    private void injectDefaultRepositories(MavenExecutionRequest request)
-            throws MavenExecutionRequestPopulationException {
-        Set<String> definedRepositories = repositorySystem.getRepoIds(request.getRemoteRepositories());
-
-        if (!definedRepositories.contains(RepositorySystem.DEFAULT_REMOTE_REPO_ID)) {
-            try {
-                request.addRemoteRepository(repositorySystem.createDefaultRemoteRepository(request));
-            } catch (Exception e) {
-                throw new MavenExecutionRequestPopulationException("Cannot create default remote repository.", e);
-            }
-        }
-    }
-
-    private void injectDefaultPluginRepositories(MavenExecutionRequest request)
-            throws MavenExecutionRequestPopulationException {
-        Set<String> definedRepositories = repositorySystem.getRepoIds(request.getPluginArtifactRepositories());
-
-        if (!definedRepositories.contains(RepositorySystem.DEFAULT_REMOTE_REPO_ID)) {
-            try {
-                request.addPluginArtifactRepository(repositorySystem.createDefaultRemoteRepository(request));
-            } catch (Exception e) {
-                throw new MavenExecutionRequestPopulationException("Cannot create default remote repository.", e);
-            }
-        }
     }
 
     private void localRepository(MavenExecutionRequest request) throws MavenExecutionRequestPopulationException {
@@ -157,11 +125,11 @@ public class DefaultMavenExecutionRequestPopulator implements MavenExecutionRequ
         }
 
         if (localRepositoryPath == null || localRepositoryPath.isEmpty()) {
-            localRepositoryPath = RepositorySystem.defaultUserLocalRepository.getAbsolutePath();
+            localRepositoryPath = new File(System.getProperty("user.home"), ".m2/repository").getAbsolutePath();
         }
 
         try {
-            return repositorySystem.createLocalRepository(request, new File(localRepositoryPath));
+            return repositorySystem.createLocalRepository(new File(localRepositoryPath));
         } catch (Exception e) {
             throw new MavenExecutionRequestPopulationException("Cannot create local repository.", e);
         }
